@@ -7,3 +7,6 @@ nbproject/private/
 build/
 dist/
 .DS_Store
+# Excluir carpetas de diseño y pruebas
+pruebas_jmeter/
+desing-reference/

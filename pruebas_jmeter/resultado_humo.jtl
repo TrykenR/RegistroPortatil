@@ -1,6 +1,0 @@
-timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
-1792175874465,532,1 Catalogos,200,,CP-HUM-01 1-1,text,true,,857,143,1,1,http://localhost:8080/autogestion/api/catalogos,527,0,17
-1792175875001,32,2 Identificar,200,,CP-HUM-01 1-1,text,true,,522,169,1,1,http://localhost:8080/autogestion/api/estudiante?identificador=9000000001,32,0,0
-1792175875034,72,3 Registrar,200,,CP-HUM-01 1-1,text,true,,425,257,1,1,http://localhost:8080/autogestion/api/accesos,72,0,0
-1792175875107,119,4 Login admin,200,,CP-HUM-01 1-1,text,true,,421,260,1,1,http://localhost:8080/autogestion/api/admin/login,119,0,0
-1792175875228,19,5 Historial,200,,CP-HUM-01 1-1,text,true,,4440,211,1,1,http://localhost:8080/autogestion/api/admin/historial?pagina=1,19,0,0
