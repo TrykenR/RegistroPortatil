@@ -10,113 +10,51 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Acceso a datos de Dispositivos_Estudiante.
- * Aquí vive la lógica de "¿es Caso A (nuevo) o Caso B (frecuente)?": el
- * controlador solo pregunta si la lista viene vacía o no.
- */
 public class DispositivoDAO {
 
-    /** Los equipos vinculados a un estudiante, leídos de la vista ya resuelta. */
-    public List<Dispositivo> listarPorEstudiante(int idEstudiante) throws SQLException {
-        String sql =
-            "SELECT id_dispositivo, marca, color, codigo_hex, alias, numero_serie, " +
-            "       reportado_hurto, fecha_reporte_hurto, motivo_reporte " +
-            "  FROM Vista_Dispositivos_Estudiante " +
-            " WHERE id_estudiante = ? " +
-            " ORDER BY marca, color";
-
+    /**
+     * Obtiene los dispositivos de un estudiante.
+     */
+    public List<Dispositivo> buscarPorEstudiante(int idEstudiante) throws SQLException {
         List<Dispositivo> lista = new ArrayList<>();
+        String sql = "SELECT d.id_dispositivo, d.id_estudiante, d.id_marca, d.id_color, d.alias, d.numero_serie, " +
+                     "       d.reportado_hurto, d.fecha_reporte_hurto, d.motivo_reporte, " +
+                     "       m.nombre AS marca_nombre, c.nombre AS color_nombre " +
+                     "  FROM Dispositivos_Estudiante d " +
+                     "  JOIN Marcas m ON d.id_marca = m.id_marca " +
+                     "  JOIN Colores c ON d.id_color = c.id_color " +
+                     " WHERE d.id_estudiante = ? AND d.activo = TRUE";
+
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idEstudiante);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    Dispositivo d = new Dispositivo();
-                    d.setIdDispositivo(rs.getInt("id_dispositivo"));
-                    d.setMarca(rs.getString("marca"));
-                    d.setColor(rs.getString("color"));
-                    d.setCodigoHex(rs.getString("codigo_hex"));
-                    d.setAlias(rs.getString("alias"));
-                    d.setNumeroSerie(rs.getString("numero_serie"));
-                    d.setReportadoHurto(rs.getBoolean("reportado_hurto"));
-                    d.setFechaReporteHurto(rs.getString("fecha_reporte_hurto"));
-                    d.setMotivoReporte(rs.getString("motivo_reporte"));
-                    lista.add(d);
+                    lista.add(mapearDispositivo(rs));
                 }
             }
         }
         return lista;
     }
 
-    /** Caso A: registra el equipo nuevo, ya vinculado a su dueño (con o sin serial). */
-    public int registrar(int idEstudiante, int idMarca, int idColor,
-                         String alias) throws SQLException {
-        return registrar(idEstudiante, idMarca, idColor, alias, null);
-    }
-
-    public int registrar(int idEstudiante, int idMarca, int idColor,
-                         String alias, String numeroSerie) throws SQLException {
-        String sql = "INSERT INTO Dispositivos_Estudiante " +
-                     "(id_estudiante, id_marca, id_color, alias, numero_serie) VALUES (?,?,?,?,?)";
-        try (Connection cn = ConexionBD.obtenerConexion();
-             PreparedStatement ps = cn.prepareStatement(sql,
-                     PreparedStatement.RETURN_GENERATED_KEYS)) {
-            ps.setInt(1, idEstudiante);
-            ps.setInt(2, idMarca);
-            ps.setInt(3, idColor);
-            ps.setString(4, alias);
-            ps.setString(5, (numeroSerie != null && !numeroSerie.isBlank()) ? numeroSerie.trim() : null);
-            ps.executeUpdate();
-            try (ResultSet claves = ps.getGeneratedKeys()) {
-                return claves.next() ? claves.getInt(1) : -1;
-            }
-        }
-    }
-
     /**
-     * Verifica que el dispositivo sea del estudiante que dice ser.
-     * Sin esto, cualquiera podría mandar por POST el id de un equipo ajeno
-     * y aparecer con el check verde de otra persona.
+     * Busca un dispositivo por su ID primario.
      */
-    public boolean perteneceAEstudiante(int idEstudiante, int idDispositivo) throws SQLException {
-        String sql = "SELECT 1 FROM Dispositivos_Estudiante " +
-                     " WHERE id_estudiante = ? AND id_dispositivo = ? AND activo = TRUE";
-        try (Connection cn = ConexionBD.obtenerConexion();
-             PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setInt(1, idEstudiante);
-            ps.setInt(2, idDispositivo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
-    }
-
-    /** Lee un dispositivo puntual para pintar el check gigante o evaluar alertas. */
     public Dispositivo buscarPorId(int idDispositivo) throws SQLException {
-        String sql =
-            "SELECT de.id_dispositivo, m.nombre AS marca, c.nombre AS color, c.codigo_hex, " +
-            "       de.alias, de.numero_serie, de.reportado_hurto, de.fecha_reporte_hurto, de.motivo_reporte " +
-            "  FROM Dispositivos_Estudiante de " +
-            "  JOIN Marcas m  ON m.id_marca  = de.id_marca " +
-            "  JOIN Colores c ON c.id_color = de.id_color " +
-            " WHERE de.id_dispositivo = ?";
+        String sql = "SELECT d.id_dispositivo, d.id_estudiante, d.id_marca, d.id_color, d.alias, d.numero_serie, " +
+                     "       d.reportado_hurto, d.fecha_reporte_hurto, d.motivo_reporte, " +
+                     "       m.nombre AS marca_nombre, c.nombre AS color_nombre " +
+                     "  FROM Dispositivos_Estudiante d " +
+                     "  JOIN Marcas m ON d.id_marca = m.id_marca " +
+                     "  JOIN Colores c ON d.id_color = c.id_color " +
+                     " WHERE d.id_dispositivo = ? AND d.activo = TRUE";
+
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    Dispositivo d = new Dispositivo();
-                    d.setIdDispositivo(rs.getInt("id_dispositivo"));
-                    d.setMarca(rs.getString("marca"));
-                    d.setColor(rs.getString("color"));
-                    d.setCodigoHex(rs.getString("codigo_hex"));
-                    d.setAlias(rs.getString("alias"));
-                    d.setNumeroSerie(rs.getString("numero_serie"));
-                    d.setReportadoHurto(rs.getBoolean("reportado_hurto"));
-                    d.setFechaReporteHurto(rs.getString("fecha_reporte_hurto"));
-                    d.setMotivoReporte(rs.getString("motivo_reporte"));
-                    return d;
+                    return mapearDispositivo(rs);
                 }
             }
         }
@@ -124,43 +62,78 @@ public class DispositivoDAO {
     }
 
     /**
-     * Cambia el estado de hurto/extravío de un dispositivo.
-     * Solo el propio estudiante dueño puede reportarlo o desmarcarlo.
+     * Verifica si un dispositivo pertenece a determinado estudiante.
      */
-    public boolean actualizarReporteHurto(int idDispositivo, int idEstudiante,
-                                          boolean reportado, String motivo) throws SQLException {
-        String sql =
-            "UPDATE Dispositivos_Estudiante " +
-            "   SET reportado_hurto = ?, " +
-            "       fecha_reporte_hurto = (CASE WHEN ? = TRUE THEN NOW() ELSE NULL END), " +
-            "       motivo_reporte = ? " +
-            " WHERE id_dispositivo = ? AND id_estudiante = ? AND activo = TRUE";
+    public boolean perteneceAEstudiante(int idDispositivo, int idEstudiante) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM Dispositivos_Estudiante WHERE id_dispositivo = ? AND id_estudiante = ? AND activo = TRUE";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setBoolean(1, reportado);
-            ps.setBoolean(2, reportado);
-            ps.setString(3, (reportado && motivo != null) ? motivo.trim() : null);
-            ps.setInt(4, idDispositivo);
-            ps.setInt(5, idEstudiante);
-            return ps.executeUpdate() > 0;
+            ps.setInt(1, idDispositivo);
+            ps.setInt(2, idEstudiante);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0;
+            }
         }
     }
 
     /**
-     * Registra un incidente de seguridad para auditoría de vigilancia.
+     * Registra un nuevo dispositivo.
      */
-    public void registrarAlertaSeguridad(int idDispositivo, String tipoAlerta, String descripcion) {
-        String sql = "INSERT INTO Alertas_Seguridad (id_dispositivo, tipo_alerta, descripcion, fecha_hora) " +
-                     "VALUES (?, ?, ?, NOW())";
+    public int registrar(int idEstudiante, int idMarca, int idColor, String alias, String numeroSerie) throws SQLException {
+        String sql = "INSERT INTO Dispositivos_Estudiante (id_estudiante, id_marca, id_color, alias, numero_serie) " +
+                     "VALUES (?, ?, ?, ?, ?)";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, idEstudiante);
+            ps.setInt(2, idMarca);
+            ps.setInt(3, idColor);
+            
+            if (alias != null && !alias.isBlank()) {
+                ps.setString(4, alias.trim());
+            } else {
+                ps.setNull(4, java.sql.Types.VARCHAR);
+            }
+
+            if (numeroSerie != null && !numeroSerie.isBlank()) {
+                ps.setString(5, numeroSerie.trim());
+            } else {
+                ps.setNull(5, java.sql.Types.VARCHAR);
+            }
+
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                return rs.next() ? rs.getInt(1) : -1;
+            }
+        }
+    }
+
+    /**
+     * Registra una alerta de seguridad (por ejemplo: HURTO o DISCREPANCIA_SALIDA).
+     */
+    public boolean registrarAlertaSeguridad(int idDispositivo, String tipoAlerta, String descripcion) throws SQLException {
+        String sql = "INSERT INTO Alertas_Seguridad (id_dispositivo, tipo_alerta, descripcion) VALUES (?, ?, ?)";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);
             ps.setString(2, tipoAlerta);
             ps.setString(3, descripcion);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            // No frenar la respuesta al cliente si falla el log de auditoría
-            e.printStackTrace();
+            return ps.executeUpdate() > 0;
         }
+    }
+
+    private Dispositivo mapearDispositivo(ResultSet rs) throws SQLException {
+        Dispositivo d = new Dispositivo();
+        d.setIdDispositivo(rs.getInt("id_dispositivo"));
+        d.setIdEstudiante(rs.getInt("id_estudiante"));
+        d.setIdMarca(rs.getInt("id_marca"));
+        d.setIdColor(rs.getInt("id_color"));
+        d.setAlias(rs.getString("alias"));
+        d.setNumeroSerie(rs.getString("numero_serie"));
+        d.setReportadoHurto(rs.getBoolean("reportado_hurto"));
+        d.setFechaReporteHurto(rs.getTimestamp("fecha_reporte_hurto"));
+        d.setMotivoReporte(rs.getString("motivo_reporte"));
+        d.setMarca(rs.getString("marca_nombre"));
+        d.setColor(rs.getString("color_nombre"));
+        return d;
     }
 }
