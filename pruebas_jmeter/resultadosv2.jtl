@@ -1,0 +1,11 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1792185243145,828,CP-IDE-01 Identificar,200,OK,Casos_Funcionales 1-1,text,true,,396,317,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/estudiante/nuevo,825,0,585
+1792185243145,828,CP-IDE-01 Identificar,200,OK,Casos_Funcionales 1-1,text,true,,396,317,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/estudiante/nuevo,825,0,585
+1792185243977,228,CP-FLU-01 Registro Entrada,200,OK,Casos_Funcionales 1-1,text,true,,473,261,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/accesos,228,0,0
+1792185243977,228,CP-FLU-01 Registro Entrada,200,OK,Casos_Funcionales 1-1,text,true,,473,261,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/accesos,228,0,0
+1792185246207,235,CP-FLU-01 Registro Salida,200,OK,Casos_Funcionales 1-1,text,true,,473,261,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/accesos,235,0,0
+1792185246207,235,CP-FLU-01 Registro Salida,200,OK,Casos_Funcionales 1-1,text,true,,473,261,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/accesos,235,0,0
+1792185246443,215,CP-VAL-01 Error Controlado,400,Bad Request,Casos_Funcionales 1-1,text,true,,458,320,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/estudiante/nuevo,215,0,0
+1792185246443,215,CP-VAL-01 Error Controlado,400,Bad Request,Casos_Funcionales 1-1,text,true,,458,320,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/estudiante/nuevo,215,0,0
+1792185246660,220,CP-HIS-01 Historial,200,OK,Casos_Funcionales 1-1,text,true,,900,212,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/catalogos,220,0,0
+1792185246660,220,CP-HIS-01 Historial,200,OK,Casos_Funcionales 1-1,text,true,,900,212,1,1,https://sheath-renounce-keg.ngrok-free.dev/autogestion/api/catalogos,220,0,0

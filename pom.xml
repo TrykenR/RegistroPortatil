@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Proyecto web Java (WAR) para el MVP de Autogestión de Portátiles.
+
+  Se entrega como proyecto Maven porque tanto IntelliJ IDEA como NetBeans
+  lo abren directamente con File > Open sobre este pom.xml, sin necesidad
+  de reconfigurar librerías a mano: Maven descarga el driver de MySQL y
+  la API de Servlets solo.
+
+  IMPORTANTE SOBRE LA VERSIÓN DE TOMCAT:
+  Este pom usa jakarta.servlet (Tomcat 10+, Jakarta EE 9+), que es lo que
+  usan los imports del código. Si tu Tomcat es 9 o anterior, cambia la
+  dependencia a javax.servlet-api (está comentada abajo) y reemplaza en
+  todos los .java el import 'jakarta.servlet' por 'javax.servlet'.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>co.edu.uniguajira</groupId>
+    <artifactId>autogestion-portatiles</artifactId>
+    <version>1.0.0</version>
+    <packaging>war</packaging>
+
+    <name>Autogestion de Portatiles Uniguajira</name>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+
+        <!-- API de Servlets. 'provided' porque la aporta Tomcat en tiempo
+             de ejecución; no debe empaquetarse dentro del WAR. -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Alternativa para Tomcat 9 o anterior:
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+        -->
+
+        <!-- Driver JDBC de MySQL. Este sí viaja dentro del WAR. -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.4.0</version>
+        </dependency>
+
+        <!-- Hash seguro para la contraseña del panel de administración
+             (el "Acceder" del portero). Nunca se guarda ni se compara
+             la clave en texto plano. -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <!-- El WAR se llamará autogestion.war, así que el contexto queda
+             en /autogestion (importante: la URL que pones en el QR de
+             Ngrok debe incluir esa ruta). -->
+        <finalName>autogestion</finalName>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

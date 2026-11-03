@@ -1,0 +1,11 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1792177740486,33,1 Catalogos,200,,CP-REG-01 1-1,text,true,,857,143,1,1,http://localhost:8080/autogestion/api/catalogos,29,0,16
+1792177740486,33,1 Catalogos,200,,CP-REG-01 1-1,text,true,,857,143,1,1,http://localhost:8080/autogestion/api/catalogos,29,0,16
+1792177740523,12,2 Identificar,200,,CP-REG-01 1-1,text,true,,522,169,1,1,http://localhost:8080/autogestion/api/estudiante?identificador=9000000001,12,0,0
+1792177740523,12,2 Identificar,200,,CP-REG-01 1-1,text,true,,522,169,1,1,http://localhost:8080/autogestion/api/estudiante?identificador=9000000001,12,0,0
+1792177740536,23,3 Registrar,200,,CP-REG-01 1-1,text,true,,425,257,1,1,http://localhost:8080/autogestion/api/accesos,23,0,0
+1792177740536,23,3 Registrar,200,,CP-REG-01 1-1,text,true,,425,257,1,1,http://localhost:8080/autogestion/api/accesos,23,0,0
+1792177740560,91,4 Login admin,200,,CP-REG-01 1-1,text,true,,421,260,1,1,http://localhost:8080/autogestion/api/admin/login,91,0,0
+1792177740560,91,4 Login admin,200,,CP-REG-01 1-1,text,true,,421,260,1,1,http://localhost:8080/autogestion/api/admin/login,91,0,0
+1792177740653,10,5 Historial,200,,CP-REG-01 1-1,text,true,,4695,211,1,1,http://localhost:8080/autogestion/api/admin/historial?pagina=1,10,0,0
+1792177740653,10,5 Historial,200,,CP-REG-01 1-1,text,true,,4695,211,1,1,http://localhost:8080/autogestion/api/admin/historial?pagina=1,10,0,0

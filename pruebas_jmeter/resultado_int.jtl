@@ -1,0 +1,5 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1792176980657,60,1 Primer toque,200,,CP-INT-01 1-1,text,true,,425,257,1,1,http://localhost:8080/autogestion/api/accesos,56,0,19
+1792176980720,20,2 Segundo toque inmediato,200,,CP-INT-01 1-1,text,true,,428,257,1,1,http://localhost:8080/autogestion/api/accesos,20,0,0
+1792177551667,41,1 Primer toque,200,,CP-INT-01 1-1,text,true,,425,257,1,1,http://localhost:8080/autogestion/api/accesos,38,0,16
+1792177551710,20,2 Segundo toque inmediato,200,,CP-INT-01 1-1,text,false,"Test failed: text expected to contain /""movimiento"":""REGISTRADO""/",425,257,1,1,http://localhost:8080/autogestion/api/accesos,20,0,0
