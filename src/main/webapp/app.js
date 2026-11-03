@@ -765,22 +765,36 @@ async function guardarEquipoYRegistrar() {
   mostrarError('#error-equipo-nuevo', '');
 
   try {
-    // 1. Obtener ID de marca y color correspondientes de la API o usar mapeo
+    // 1. Obtener catálogos de la API
     const catalogos = await pedir('/catalogos');
-    const marcaObj = catalogos.marcas.find((m) => m.nombre.toLowerCase() === b.toLowerCase()) || catalogos.marcas.find((m) => m.nombre === 'OTRA') || catalogos.marcas[0];
-    const colorObj = catalogos.colores.find((col) => col.nombre.toLowerCase() === c.toLowerCase()) || catalogos.colores[0];
+    
+    // 2. Extraer los objetos de marca y color
+    const marcaObj = catalogos.marcas.find((m) => m.nombre.toLowerCase() === b.toLowerCase()) || 
+                     catalogos.marcas.find((m) => m.nombre === 'OTRA') || 
+                     catalogos.marcas[0];
+                     
+    const colorObj = catalogos.colores.find((col) => col.nombre.toLowerCase() === c.toLowerCase()) || 
+                     catalogos.colores[0];
 
+    // Extraer los IDs sin importar si vienen como .id, .id_marca / .id_color o .idMarca / .idColor
+    const idMarcaVal = marcaObj.id || marcaObj.id_marca || marcaObj.idMarca;
+    const idColorVal = colorObj.id || colorObj.id_color || colorObj.idColor;
+
+    // 3. Enviar los parámetros en ambos formatos (snake_case y camelCase) para máxima compatibilidad
     const cuerpo = new URLSearchParams({
       idEstudiante: estado.idEstudiante,
-      idMarca: marcaObj.id,
-      idColor: colorObj.id,
+      id_estudiante: estado.idEstudiante,
+      idMarca: idMarcaVal,
+      id_marca: idMarcaVal,
+      idColor: idColorVal,
+      id_color: idColorVal,
       alias: nick
     });
 
     const nuevo = await pedir('/dispositivos', { method: 'POST', body: cuerpo });
 
     await registrarAcceso({
-      id: nuevo.idDispositivo,
+      id: nuevo.idDispositivo || nuevo.id_dispositivo,
       marca: b,
       color: c,
       alias: nick
