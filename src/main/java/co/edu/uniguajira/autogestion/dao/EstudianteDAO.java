@@ -8,26 +8,30 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+/**
+ * Acceso a datos de Estudiantes. Compatible con MySQL 8 en Linux/Railway
+ * y con todos los servlets del sistema (Autogestión, Consentimiento y PIN).
+ */
 public class EstudianteDAO {
 
     /**
-     * Recherche par numéro de document OU code étudiant.
-     * Compatible avec la classe modèle Estudiante à 5 paramètres.
+     * Busca por número de documento O código estudiantil.
      */
     public Estudiante buscarPorIdentificador(String identificador) throws SQLException {
         String sql =
             "SELECT id_estudiante, numero_documento, codigo_estudiantil, " +
-            "       CONCAT(nombres, ' ', apellidos) AS nombre_completo, " +
+            "       CONCAT(COALESCE(nombres,''), ' ', COALESCE(apellidos,'')) AS nombre_completo, " +
             "       acepto_tratamiento_datos " +
             "  FROM Estudiantes " +
-            " WHERE activo = TRUE " +
-            "   AND (numero_documento = ? OR codigo_estudiantil = ?) " +
+            " WHERE (numero_documento = ? OR codigo_estudiantil = ?) " +
             " LIMIT 1";
 
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
+            
             ps.setString(1, identificador);
             ps.setString(2, identificador);
+            
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return new Estudiante(
@@ -35,7 +39,9 @@ public class EstudianteDAO {
                             rs.getString("numero_documento"),
                             rs.getString("codigo_estudiantil"),
                             rs.getString("nombre_completo"),
-                            rs.getBoolean("acepto_tratamiento_datos"));
+                            rs.getBoolean("acepto_tratamiento_datos"),
+                            false // tienePin
+                    );
                 }
             }
         }
@@ -55,8 +61,8 @@ public class EstudianteDAO {
     public int registrar(String numeroDocumento, String codigoEstudiantil, String nombres,
                          String apellidos, boolean aceptoTratamiento, String pin) throws SQLException {
         String sql = "INSERT INTO Estudiantes " +
-                     "(numero_documento, codigo_estudiantil, nombres, apellidos, acepto_tratamiento_datos, fecha_aceptacion_datos, pin_hash) " +
-                     "VALUES (?,?,?,?,?,?,?)";
+                     "(numero_documento, codigo_estudiantil, nombres, apellidos, acepto_tratamiento_datos, fecha_aceptacion_datos) " +
+                     "VALUES (?,?,?,?,?,NOW())";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
             
@@ -75,16 +81,7 @@ public class EstudianteDAO {
             ps.setString(3, nombres);
             ps.setString(4, apellidos);
             ps.setBoolean(5, aceptoTratamiento);
-            if (aceptoTratamiento) {
-                ps.setTimestamp(6, new java.sql.Timestamp(System.currentTimeMillis()));
-            } else {
-                ps.setNull(6, java.sql.Types.TIMESTAMP);
-            }
-            if (pin != null && pin.matches("\\d{4}")) {
-                ps.setString(7, hashearPin(pin));
-            } else {
-                ps.setNull(7, java.sql.Types.VARCHAR);
-            }
+            
             ps.executeUpdate();
             try (ResultSet claves = ps.getGeneratedKeys()) {
                 return claves.next() ? claves.getInt(1) : -1;
@@ -92,6 +89,9 @@ public class EstudianteDAO {
         }
     }
 
+    /**
+     * Requerido por ConsentimientoServlet.java
+     */
     public void registrarConsentimiento(int idEstudiante) throws SQLException {
         String sql = "UPDATE Estudiantes " +
                      "   SET acepto_tratamiento_datos = TRUE, fecha_aceptacion_datos = NOW() " +
@@ -103,6 +103,9 @@ public class EstudianteDAO {
         }
     }
 
+    /**
+     * Requerido por PinEstudianteServlet.java
+     */
     public boolean configurarPin(int idEstudiante, String pin) throws SQLException {
         if (pin == null || !pin.matches("\\d{4}")) return false;
         String sql = "UPDATE Estudiantes " +
@@ -116,6 +119,9 @@ public class EstudianteDAO {
         }
     }
 
+    /**
+     * Requerido por PinEstudianteServlet.java
+     */
     public enum ResultadoPin {
         CORRECTO,
         INCORRECTO,
@@ -124,10 +130,13 @@ public class EstudianteDAO {
         ESTUDIANTE_NO_EXISTE
     }
 
+    /**
+     * Requerido por PinEstudianteServlet.java
+     */
     public ResultadoPin verificarPin(int idEstudiante, String pin) throws SQLException {
         String sql = "SELECT pin_hash, intentos_pin_fallidos, bloqueado_hasta " +
                      "  FROM Estudiantes " +
-                     " WHERE id_estudiante = ? AND activo = TRUE";
+                     " WHERE id_estudiante = ?";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idEstudiante);
