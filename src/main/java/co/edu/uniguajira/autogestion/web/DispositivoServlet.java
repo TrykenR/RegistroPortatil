@@ -11,10 +11,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 
-/**
- * CASO A: agregar un equipo (primero o adicional)
- * POST /api/dispositivos (idEstudiante, idMarca, idColor, alias)
- */
 @WebServlet({"/api/dispositivos", "/api/dispositivo"})
 public class DispositivoServlet extends HttpServlet {
 
@@ -27,7 +23,7 @@ public class DispositivoServlet extends HttpServlet {
         response.setContentType("application/json;charset=UTF-8");
         PrintWriter out = response.getWriter();
 
-        // Soporte dual para parámetros en snake_case y camelCase
+        // Leer parámetros en ambos formatos para evitar el HTTP 400
         String idEstudianteParam = request.getParameter("id_estudiante") != null ? 
                 request.getParameter("id_estudiante") : request.getParameter("idEstudiante");
                 
@@ -50,7 +46,7 @@ public class DispositivoServlet extends HttpServlet {
             if (idMarcaParam != null) idMarca = Integer.parseInt(idMarcaParam.trim());
             if (idColorParam != null) idColor = Integer.parseInt(idColorParam.trim());
         } catch (NumberFormatException e) {
-            // Se mantienen en 0 para activar la respuesta SC_BAD_REQUEST
+            // Ignorar para activar validacion de BAD_REQUEST si no son enteros
         }
 
         if (idEstudiante <= 0 || idMarca <= 0 || idColor <= 0) {

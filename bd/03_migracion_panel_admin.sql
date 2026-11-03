@@ -1,11 +1,8 @@
 -- =====================================================================
--- MIGRACIÓN: panel de administración (botón "Acceder")
--- Ejecutar UNA vez sobre una base de datos que ya tenías corriendo,
--- SIN necesidad de borrar nada de lo que ya tienes cargado.
--- Si vas a montar el proyecto desde cero, no hace falta este archivo:
--- ya viene incluido en 01_esquema.sql y 02_datos_iniciales.sql.
+-- MIGRACIÓN 03B: Panel de Administración
+-- Compatible con MySQL 8.4 en Railway
 -- =====================================================================
-USE autogestion_portatiles;
+USE railway;
 
 CREATE TABLE IF NOT EXISTS Administradores (
     id_administrador SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -17,17 +14,14 @@ CREATE TABLE IF NOT EXISTS Administradores (
     UNIQUE KEY uk_administrador_usuario (usuario)
 ) ENGINE=InnoDB;
 
--- Usuario: admin   Clave: cambiar123 (cámbiala apenas puedas)
 INSERT IGNORE INTO Administradores (usuario, clave_hash) VALUES
     ('admin', '$2a$10$jmbbxYSV0h2I0.5R7ZKCQewUstt5KIFxmMG/I/nq53mSrgcgFegtu');
 
--- CREATE OR REPLACE VIEW no borra datos, solo redefine la consulta:
--- agrega codigo_estudiantil, que el buscador del panel necesita.
 CREATE OR REPLACE VIEW Vista_Historial_Accesos AS
 SELECT  h.id_registro,
         e.numero_documento,
         e.codigo_estudiantil,
-        CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+        CONCAT(COALESCE(e.nombres,''), ' ', COALESCE(e.apellidos,'')) AS estudiante,
         m.nombre AS marca,
         c.nombre AS color,
         tm.nombre AS movimiento,
@@ -43,4 +37,4 @@ JOIN    Colores c ON c.id_color = de.id_color
 JOIN    Tipos_Movimiento tm ON tm.id_tipo_movimiento = h.id_tipo_movimiento
 JOIN    Origenes_Registro o ON o.id_origen = h.id_origen;
 
-SELECT 'Migración aplicada correctamente' AS resultado;
+SELECT 'Migración del panel de administración aplicada' AS resultado;

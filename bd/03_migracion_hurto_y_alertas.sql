@@ -1,20 +1,28 @@
 -- =====================================================================
--- MIGRACIÓN: Módulo de Seguridad, Reporte de Hurto y Alertas
--- Base de datos: autogestion_portatiles
+-- MIGRACIÓN 03: Módulo de Seguridad, Reporte de Hurto y Alertas
+-- Compatible con MySQL 8.4 en Railway
 -- =====================================================================
+USE railway;
 
-USE autogestion_portatiles;
+-- 1. Agregar columnas a Dispositivos_Estudiante
+SET @col_serie_existe := (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'Dispositivos_Estudiante'
+       AND COLUMN_NAME = 'numero_serie');
 
--- 1. Agregar columnas a Dispositivos_Estudiante si no existen
-ALTER TABLE Dispositivos_Estudiante
-    ADD COLUMN IF NOT EXISTS numero_serie        VARCHAR(50)  NULL AFTER alias,
-    ADD COLUMN IF NOT EXISTS reportado_hurto     BOOLEAN      NOT NULL DEFAULT FALSE AFTER numero_serie,
-    ADD COLUMN IF NOT EXISTS fecha_reporte_hurto DATETIME     NULL AFTER reportado_hurto,
-    ADD COLUMN IF NOT EXISTS motivo_reporte      VARCHAR(255) NULL AFTER fecha_reporte_hurto;
+SET @instruccion_serie := IF(@col_serie_existe = 0,
+    'ALTER TABLE Dispositivos_Estudiante
+        ADD COLUMN numero_serie        VARCHAR(50)  NULL AFTER alias,
+        ADD COLUMN reportado_hurto     BOOLEAN      NOT NULL DEFAULT FALSE AFTER numero_serie,
+        ADD COLUMN fecha_reporte_hurto DATETIME     NULL AFTER reportado_hurto,
+        ADD COLUMN motivo_reporte      VARCHAR(255) NULL AFTER fecha_reporte_hurto,
+        ADD INDEX idx_dispositivo_serie (numero_serie)',
+    'SELECT ''Las columnas de hurto ya existen'' AS aviso');
 
--- Índice para búsquedas rápidas por serial
-ALTER TABLE Dispositivos_Estudiante
-    ADD INDEX IF NOT EXISTS idx_dispositivo_serie (numero_serie);
+PREPARE stmt_serie FROM @instruccion_serie;
+EXECUTE stmt_serie;
+DEALLOCATE PREPARE stmt_serie;
 
 -- 2. Crear tabla de Alertas de Seguridad
 CREATE TABLE IF NOT EXISTS Alertas_Seguridad (
@@ -29,12 +37,12 @@ CREATE TABLE IF NOT EXISTS Alertas_Seguridad (
         REFERENCES Dispositivos_Estudiante (id_dispositivo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 3. Actualizar la vista de dispositivos para incluir campos de seguridad
+-- 3. Vista de dispositivos con campos de seguridad
 CREATE OR REPLACE VIEW Vista_Dispositivos_Estudiante AS
 SELECT  e.id_estudiante,
         e.numero_documento,
         e.codigo_estudiantil,
-        CONCAT(e.nombres, ' ', e.apellidos) AS nombre_completo,
+        CONCAT(COALESCE(e.nombres,''), ' ', COALESCE(e.apellidos,'')) AS nombre_completo,
         de.id_dispositivo,
         de.numero_serie,
         m.nombre  AS marca,
@@ -50,7 +58,7 @@ JOIN    Marcas  m ON m.id_marca = de.id_marca
 JOIN    Colores c ON c.id_color = de.id_color
 WHERE   e.activo = TRUE AND de.activo = TRUE;
 
--- 4. Vista de auditoría para el panel del portero / administrador
+-- 4. Vista de auditoría para el panel
 CREATE OR REPLACE VIEW Vista_Alertas_Seguridad AS
 SELECT  a.id_alerta,
         a.id_dispositivo,
@@ -59,7 +67,7 @@ SELECT  a.id_alerta,
         a.fecha_hora,
         e.numero_documento,
         e.codigo_estudiantil,
-        CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+        CONCAT(COALESCE(e.nombres,''), ' ', COALESCE(e.apellidos,'')) AS estudiante,
         de.numero_serie,
         m.nombre AS marca,
         c.nombre AS color
