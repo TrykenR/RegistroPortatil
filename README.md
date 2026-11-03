@@ -1,4 +1,4 @@
-# Sistema de Autogestion de Registro de Portatiles — Uniguajira
+# Sistema de Autogestion de Registro de Portatiles
 
 Sistema web con arquitectura Offline-First (PWA) disenado para agilizar el ingreso de equipos portatiles en la Universidad de La Guajira mediante codigo QR.
 
@@ -10,7 +10,7 @@ Sistema web con arquitectura Offline-First (PWA) disenado para agilizar el ingre
 * Base de Datos: MySQL 8.x normalizada hasta 4NF.
 * Frontend: PWA nativa en HTML5, CSS3 (Manual de marca Uniguajira) y Vanilla JavaScript.
 * Modo Offline: IndexedDB + Service Worker (sw.js) con Background Sync API para encolar registros sin red.
-* Despliegue: Docker + Railway (dominio HTTPS permanente y base de datos MySQL en la nube).
+* Despliegue: Docker + Railway (temporal)
 
 ---
 

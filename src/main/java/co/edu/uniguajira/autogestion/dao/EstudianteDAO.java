@@ -8,24 +8,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-/**
- * Acceso a datos de Estudiantes. Todas las consultas usan PreparedStatement
- * con parámetros: el documento que llega desde el celular es entrada no
- * confiable y nunca se concatena directo en el SQL.
- */
 public class EstudianteDAO {
 
     /**
-     * Busca por número de documento O código estudiantil — el estudiante
-     * puede escribir cualquiera de los dos.
-     * @return el estudiante, o null si es la primera vez que se presenta.
+     * Recherche par numéro de document OU code étudiant.
+     * Compatible avec la classe modèle Estudiante à 5 paramètres.
      */
     public Estudiante buscarPorIdentificador(String identificador) throws SQLException {
         String sql =
             "SELECT id_estudiante, numero_documento, codigo_estudiantil, " +
-            "       CONCAT(nombres,' ',apellidos) AS nombre_completo, " +
-            "       acepto_tratamiento_datos, " +
-            "       (pin_hash IS NOT NULL AND pin_hash <> '') AS tiene_pin " +
+            "       CONCAT(nombres, ' ', apellidos) AS nombre_completo, " +
+            "       acepto_tratamiento_datos " +
             "  FROM Estudiantes " +
             " WHERE activo = TRUE " +
             "   AND (numero_documento = ? OR codigo_estudiantil = ?) " +
@@ -42,24 +35,13 @@ public class EstudianteDAO {
                             rs.getString("numero_documento"),
                             rs.getString("codigo_estudiantil"),
                             rs.getString("nombre_completo"),
-                            rs.getBoolean("acepto_tratamiento_datos"),
-                            rs.getBoolean("tiene_pin"));
+                            rs.getBoolean("acepto_tratamiento_datos"));
                 }
             }
         }
         return null;
     }
 
-    /**
-     * Alta de autogestión total: si el identificador no existe en la BD,
-     * el propio estudiante se registra con su documento y nombre, sin que
-     * intervenga un portero. Ver ControladorAutogestionServlet.
-     *
-     * aceptoTratamiento SIEMPRE debe venir en true al llegar aquí — la
-     * validación de que el estudiante marcó la casilla vive en
-     * RegistroEstudianteServlet, antes de llamar este método. Aun así,
-     * el parámetro se guarda tal cual llega, nunca se asume.
-     */
     public int registrar(String numeroDocumento, String nombres,
                          String apellidos, boolean aceptoTratamiento) throws SQLException {
         return registrar(numeroDocumento, null, nombres, apellidos, aceptoTratamiento);
@@ -76,8 +58,8 @@ public class EstudianteDAO {
                      "(numero_documento, codigo_estudiantil, nombres, apellidos, acepto_tratamiento_datos, fecha_aceptacion_datos, pin_hash) " +
                      "VALUES (?,?,?,?,?,?,?)";
         try (Connection cn = ConexionBD.obtenerConexion();
-             PreparedStatement ps = cn.prepareStatement(sql,
-                     PreparedStatement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement ps = cn.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            
             if (numeroDocumento != null && !numeroDocumento.isBlank()) {
                 ps.setString(1, numeroDocumento.trim());
             } else {
@@ -110,11 +92,6 @@ public class EstudianteDAO {
         }
     }
 
-    /**
-     * Para un estudiante que YA existía antes de que este consentimiento
-     * existiera en el sistema (ver migración 04): registra que ahora sí
-     * lo dio, sin tocar ningún otro dato suyo.
-     */
     public void registrarConsentimiento(int idEstudiante) throws SQLException {
         String sql = "UPDATE Estudiantes " +
                      "   SET acepto_tratamiento_datos = TRUE, fecha_aceptacion_datos = NOW() " +
@@ -126,9 +103,6 @@ public class EstudianteDAO {
         }
     }
 
-    /**
-     * Configura o actualiza el PIN de 4 dígitos del estudiante.
-     */
     public boolean configurarPin(int idEstudiante, String pin) throws SQLException {
         if (pin == null || !pin.matches("\\d{4}")) return false;
         String sql = "UPDATE Estudiantes " +
@@ -142,9 +116,6 @@ public class EstudianteDAO {
         }
     }
 
-    /**
-     * Resultado de la verificación de PIN
-     */
     public enum ResultadoPin {
         CORRECTO,
         INCORRECTO,
@@ -153,9 +124,6 @@ public class EstudianteDAO {
         ESTUDIANTE_NO_EXISTE
     }
 
-    /**
-     * Verifica si el PIN es correcto. Aplica bloqueo por 15 minutos tras 4 fallos consecutivos.
-     */
     public ResultadoPin verificarPin(int idEstudiante, String pin) throws SQLException {
         String sql = "SELECT pin_hash, intentos_pin_fallidos, bloqueado_hasta " +
                      "  FROM Estudiantes " +
@@ -170,7 +138,6 @@ public class EstudianteDAO {
                 int intentos = rs.getInt("intentos_pin_fallidos");
                 java.sql.Timestamp bloqueadoHasta = rs.getTimestamp("bloqueado_hasta");
 
-                // Verificar si está bloqueado temporalmente
                 if (bloqueadoHasta != null && bloqueadoHasta.after(new java.sql.Timestamp(System.currentTimeMillis()))) {
                     return ResultadoPin.BLOQUEADO;
                 }
@@ -181,11 +148,9 @@ public class EstudianteDAO {
 
                 String hashIngresado = hashearPin(pin);
                 if (hashBd.equals(hashIngresado)) {
-                    // Resetear intentos si acertó
                     resetearIntentosPin(idEstudiante);
                     return ResultadoPin.CORRECTO;
                 } else {
-                    // Incrementar intentos fallidos
                     registrarFalloPin(idEstudiante, intentos + 1);
                     return (intentos + 1 >= 4) ? ResultadoPin.BLOQUEADO : ResultadoPin.INCORRECTO;
                 }
@@ -205,7 +170,6 @@ public class EstudianteDAO {
     private void registrarFalloPin(int idEstudiante, int nuevosIntentos) throws SQLException {
         String sql;
         if (nuevosIntentos >= 4) {
-            // Bloqueo de 15 minutos
             sql = "UPDATE Estudiantes SET intentos_pin_fallidos = ?, bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id_estudiante = ?";
         } else {
             sql = "UPDATE Estudiantes SET intentos_pin_fallidos = ? WHERE id_estudiante = ?";
@@ -218,9 +182,6 @@ public class EstudianteDAO {
         }
     }
 
-    /**
-     * Hash seguro con SHA-256 + Salt específico para autogestión de portátiles
-     */
     public static String hashearPin(String pin) {
         try {
             String salt = "Uniguajira_PinSalt_2026_#";
