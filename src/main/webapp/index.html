@@ -24,7 +24,7 @@
       <div id="status-banner-icon" class="status-banner-icon"></div>
       <div class="status-banner-text">
         <p id="status-banner-title" class="status-banner-title">Sin conexión</p>
-        <p id="status-banner-detail" class="status-banner-detail">Tus registros se guardarán en el celular</p>
+        <p id="status-banner-detail" class="status-banner-detail">Tus registros se guardarán en el localmente</p>
       </div>
       <div id="status-stitches" class="status-stitches" style="display: none;"></div>
     </div>
@@ -164,7 +164,7 @@
           <input id="campo-pin-nuevo" class="field-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" style="letter-spacing: 0.3em; font-size: 20px; text-align: center;">
         </label>
         <p style="font-size: 13px; color: var(--sub); margin-top: 4px;">
-          Te servirá para autorizar tus entradas y salidas rápidamente en portería.
+          Protección ante entradas/salidas. Se solicita siempre que ingreses nuevamente.
         </p>
       </div>
 
@@ -176,7 +176,7 @@
               <svg id="consent-check-icon-nuevo" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M20 6 9 17l-5-5"/></svg>
             </span>
             <span style="font-size: 15px; line-height: 1.35; color: var(--tinta);">
-              Autorizo a la Universidad de La Guajira a tratar mis datos personales <span style="color: var(--sub);">(Ley 1581 de 2012)</span>.
+              Autorizo a Registro de Dispositivos Portatiles a tratar mis datos personales <span style="color: var(--sub);">(Ley 1581 de 2012)</span>.
             </span>
           </label>
           <details class="consent-details">
@@ -185,7 +185,7 @@
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
             </summary>
             <p>
-              Solo para registrar cuándo entra y sale tu portátil del campus, y así poder ayudarte si se pierde o hay una duda en portería. No se comparten con terceros. Puedes pedir que se corrijan o borren escribiendo a la oficina de Bienestar.
+              Solo para registrar cuándo entra y sale tu portátil del campus, y así poder ayudarte si se pierde o hay una duda en portería. No se comparten con terceros. Puedes pedir que se corrijan o borren escribiendo al correo acamilogamez@uniguajira.edu.co.
             </p>
           </details>
         </div>
@@ -219,7 +219,7 @@
         <p class="eyebrow">Una sola vez</p>
         <h1 id="titulo-consentimiento" class="title-big">Antes de seguir…</h1>
         <p class="sub-desc" style="max-width: 32ch;">
-          Actualizamos cómo cuidamos tu información. Necesitamos tu autorización para seguir registrando tu equipo. No te lo volveremos a preguntar.
+          Necesitamos tu autorización para seguir registrando tu equipo.
         </p>
       </div>
 
@@ -230,7 +230,7 @@
             <svg id="consent-check-icon-existente" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><path d="M20 6 9 17l-5-5"/></svg>
           </span>
           <span style="font-size: 15px; line-height: 1.35; color: var(--tinta);">
-            Autorizo a la Universidad de La Guajira a tratar mis datos personales <span style="color: var(--sub);">(Ley 1581 de 2012)</span>.
+            Autorizo a Registro de Dispositivos Portatiles a tratar mis datos personales <span style="color: var(--sub);">(Ley 1581 de 2012)</span>.
           </span>
         </label>
       </div>
@@ -292,7 +292,7 @@
         <div id="preview-laptop-glyph"></div>
         <div style="min-width: 0; line-height: 1.2;">
           <p id="preview-laptop-title" class="preview-title">MARCA - COLOR</p>
-          <p id="preview-laptop-nick" class="preview-sub">Así lo verá el portero</p>
+          <p id="preview-laptop-nick" class="preview-sub">Así se verá la próxima vez.</p>
         </div>
       </div>
 
@@ -375,6 +375,79 @@
       </button>
     </div>
   </section>
+</div>
+
+<!-- =====================================================================
+     BOTÓN FLOTANTE Y MODAL DE GUÍA DE USO
+     ===================================================================== -->
+<div id="guia-flotante-wrap" class="guia-flotante-wrap">
+  <button id="btn-abrir-guia" type="button" class="btn-guia-circulo" aria-label="Abrir guía de uso">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+    <span id="guia-tag-texto" class="guia-tag-texto anim-tag-mostrar">Guía de uso</span>
+  </button>
+</div>
+
+<!-- Modal Dialog de Guía de Uso -->
+<div id="modal-guia" class="modal-guia-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="guia-titulo">
+  <div class="modal-guia-card">
+    <header class="modal-guia-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="modal-guia-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+        </span>
+        <h2 id="guia-titulo" class="modal-guia-titulo">Guía del Sistema</h2>
+      </div>
+      <button id="btn-cerrar-guia" type="button" class="btn-guia-cerrar" aria-label="Cerrar guía">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </header>
+
+    <div class="modal-guia-body">
+      <div class="guia-paso">
+        <span class="guia-num">1</span>
+        <div>
+          <strong>Identificación</strong>
+          <p>Ingresa tu cédula o código estudiantil. Si eres nuevo, el sistema te solicitará tus nombres, PIN y la marca/color de tu equipo.</p>
+        </div>
+      </div>
+
+      <div class="guia-paso">
+        <span class="guia-num">2</span>
+        <div>
+          <strong>Seguridad con PIN</strong>
+          <p>Digita tus 4 números de PIN para verificar tu identidad y desbloquear tus portátiles registrados.</p>
+        </div>
+      </div>
+
+      <div class="guia-paso">
+        <span class="guia-num">3</span>
+        <div>
+          <strong>Entrada o Salida en 1 Toque</strong>
+          <p>Toca tu portátil en pantalla. El sistema alternará automáticamente entre ENTRADA y SALIDA con confirmación visual inmediata.</p>
+        </div>
+      </div>
+
+      <div class="guia-paso">
+        <span class="guia-num">4</span>
+        <div>
+          <strong>Sin Conexión (Offline)</strong>
+          <p>Si la portería pierde internet, tus registros se guardan en el dispositivo y se sincronizan solos al recuperar señal.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer class="modal-guia-footer">
+      <button id="btn-entendido-guia" type="button" class="btn-guia-entendido">Entendido</button>
+    </footer>
+  </div>
 </div>
 
 <script src="db-offline.js"></script>

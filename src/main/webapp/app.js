@@ -1111,6 +1111,53 @@ function iniciar() {
     actualizarBarraEstado();
   });
   window.addEventListener('offline', actualizarBarraEstado);
+
+  // Inicializar botón y comportamiento de Guía de uso
+  iniciarGuiaDeUso();
+}
+
+/* =====================================================================
+   COMPORTAMIENTO GUÍA DE USO
+   ===================================================================== */
+function iniciarGuiaDeUso() {
+  const tagTexto = $('#guia-tag-texto');
+  const modal = $('#modal-guia');
+  const btnAbrir = $('#btn-abrir-guia');
+  const btnCerrar = $('#btn-cerrar-guia');
+  const btnEntendido = $('#btn-entendido-guia');
+
+  if (!btnAbrir || !modal) return;
+
+  // Al entrar, la etiqueta "Guía de uso" se muestra y se oculta automáticamente a los 2.5 segundos
+  setTimeout(() => {
+    if (tagTexto) {
+      tagTexto.classList.add('escondido');
+    }
+  }, 2500);
+
+  // Al pasar el mouse por encima vuelve a mostrar la etiqueta si el usuario quiere leerla
+  btnAbrir.addEventListener('mouseenter', () => {
+    if (tagTexto) tagTexto.classList.remove('escondido');
+  });
+  btnAbrir.addEventListener('mouseleave', () => {
+    if (tagTexto) tagTexto.classList.add('escondido');
+  });
+
+  const abrirModal = () => {
+    modal.style.display = 'flex';
+  };
+  const cerrarModal = () => {
+    modal.style.display = 'none';
+  };
+
+  btnAbrir.addEventListener('click', abrirModal);
+  btnCerrar?.addEventListener('click', cerrarModal);
+  btnEntendido?.addEventListener('click', cerrarModal);
+
+  // Cerrar al tocar fuera de la tarjeta
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) cerrarModal();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', iniciar);

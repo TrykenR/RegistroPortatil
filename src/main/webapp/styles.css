@@ -900,3 +900,196 @@ input, select {
   animation: fade 300ms ease-out both;
   animation-delay: 1500ms;
 }
+
+/* =====================================================================
+   BOTÓN FLOTANTE Y MODAL DE GUÍA DE USO
+   ===================================================================== */
+.guia-flotante-wrap {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+}
+
+.btn-guia-circulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background-color: var(--tinta);
+  color: #FFFFFF;
+  box-shadow: 0 6px 18px rgba(36, 28, 22, 0.22);
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.btn-guia-circulo:hover {
+  transform: translateY(-2px);
+  background-color: #000000;
+  box-shadow: 0 8px 24px rgba(36, 28, 22, 0.32);
+}
+
+.btn-guia-circulo:active {
+  transform: scale(0.96);
+}
+
+.guia-tag-texto {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  max-width: 120px;
+  opacity: 1;
+  transition: max-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s ease,
+              padding 0.35s ease;
+}
+
+.guia-tag-texto.escondido {
+  max-width: 0;
+  opacity: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* Modal Overlay */
+.modal-guia-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(36, 28, 22, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fade 220ms ease-out both;
+}
+
+.modal-guia-card {
+  width: 100%;
+  max-width: 440px;
+  background-color: #FFFFFF;
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--borde);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.modal-guia-header {
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--cont);
+  background-color: var(--papel);
+}
+
+.modal-guia-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background-color: var(--teal-soft);
+  color: var(--teal-dark);
+  display: grid;
+  place-items: center;
+}
+
+.modal-guia-titulo {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--tinta);
+  letter-spacing: -0.02em;
+}
+
+.btn-guia-cerrar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--sub);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-guia-cerrar:hover {
+  background: var(--cont);
+  color: var(--tinta);
+}
+
+.modal-guia-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.guia-paso {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.guia-num {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--cont);
+  color: var(--tinta);
+  font-weight: 800;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+}
+
+.guia-paso strong {
+  display: block;
+  font-size: 14px;
+  color: var(--tinta);
+  margin-bottom: 2px;
+}
+
+.guia-paso p {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--sub);
+}
+
+.modal-guia-footer {
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--cont);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-guia-entendido {
+  height: 42px;
+  padding: 0 24px;
+  border-radius: 12px;
+  background-color: var(--tinta);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-guia-entendido:hover {
+  opacity: 0.9;
+}
