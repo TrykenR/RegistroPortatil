@@ -119,6 +119,6 @@ public class RegistroAccesoServlet extends HttpServlet {
     }
 
     private String formatHoraActual() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.of("es", "CO")));
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.forLanguageTag("es-CO")));
     }
 }
