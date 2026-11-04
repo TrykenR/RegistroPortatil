@@ -1124,7 +1124,14 @@ function iniciarGuiaDeUso() {
   const modal = $('#modal-guia');
   const btnAbrir = $('#btn-abrir-guia');
   const btnCerrar = $('#btn-cerrar-guia');
+  const btnCerrar2 = $('#btn-cerrar-guia-2');
   const btnEntendido = $('#btn-entendido-guia');
+  const btnEntendidoAdmin = $('#btn-entendido-guia-admin');
+
+  const cardEstudiante = $('#guia-card-estudiante');
+  const cardAdmin = $('#guia-card-admin');
+  const btnIrAdmin = $('#btn-guia-ir-admin');
+  const btnVolverEstudiante = $('#btn-guia-volver-estudiante');
 
   if (!btnAbrir || !modal) return;
 
@@ -1144,15 +1151,31 @@ function iniciarGuiaDeUso() {
   });
 
   const abrirModal = () => {
+    mostrarTarjetaEstudiante();
     modal.style.display = 'flex';
   };
   const cerrarModal = () => {
     modal.style.display = 'none';
   };
 
+  const mostrarTarjetaAdmin = () => {
+    if (cardEstudiante) cardEstudiante.style.display = 'none';
+    if (cardAdmin) cardAdmin.style.display = 'flex';
+  };
+
+  const mostrarTarjetaEstudiante = () => {
+    if (cardAdmin) cardAdmin.style.display = 'none';
+    if (cardEstudiante) cardEstudiante.style.display = 'flex';
+  };
+
   btnAbrir.addEventListener('click', abrirModal);
   btnCerrar?.addEventListener('click', cerrarModal);
+  btnCerrar2?.addEventListener('click', cerrarModal);
   btnEntendido?.addEventListener('click', cerrarModal);
+  btnEntendidoAdmin?.addEventListener('click', cerrarModal);
+
+  btnIrAdmin?.addEventListener('click', mostrarTarjetaAdmin);
+  btnVolverEstudiante?.addEventListener('click', mostrarTarjetaEstudiante);
 
   // Cerrar al tocar fuera de la tarjeta
   modal.addEventListener('click', (e) => {

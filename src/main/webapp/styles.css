@@ -1078,6 +1078,62 @@ input, select {
   justify-content: flex-end;
 }
 
+.modal-guia-footer-dual {
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-guia-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background-color: var(--papel);
+  color: var(--tinta);
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid var(--borde);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-guia-nav:hover {
+  background-color: var(--cont);
+  border-color: var(--tinta);
+  transform: translateY(-1px);
+}
+
+.btn-guia-nav:active {
+  transform: scale(0.97);
+}
+
+.btn-guia-nav svg {
+  color: var(--sub);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.btn-guia-nav:hover svg {
+  color: var(--tinta);
+  transform: translateX(2px);
+}
+
+.btn-guia-nav-prev:hover svg {
+  transform: translateX(-2px);
+}
+
+.modal-guia-icon-admin {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
+.guia-num-admin {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
 .btn-guia-entendido {
   height: 42px;
   padding: 0 24px;
