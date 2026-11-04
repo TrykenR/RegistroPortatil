@@ -10,3 +10,11 @@ dist/
 # Excluir carpetas de diseño y pruebas
 pruebas_jmeter/
 desing-reference/
+
+# Archivos temporales, respaldos locales y dumps
+*.log
+*.txt
+*.bat
+*.bak
+copia_*.sql
+temp_*
