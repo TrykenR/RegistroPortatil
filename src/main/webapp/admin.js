@@ -559,11 +559,22 @@ function pintarResultados(registros, totalRegistros) {
     registros.forEach((registro) => {
         const fila = document.createElement('tr');
 
+        // Auto-corrección defensiva en el cliente por si vienen cruzados o sin clasificar:
+        let doc = registro.documento;
+        let cod = registro.codigo;
+        if (doc && doc.trim().startsWith('0') && (!cod || cod === '—')) {
+            cod = doc;
+            doc = null;
+        } else if (cod && !cod.trim().startsWith('0') && (!doc || doc === '—')) {
+            doc = cod;
+            cod = null;
+        }
+
         fila.appendChild(celda(formatearFecha(registro.fechaEvento)));
         fila.appendChild(celda(registro.movimiento));
         fila.appendChild(celda(registro.estudiante));
-        fila.appendChild(celda(registro.documento || '—'));
-        fila.appendChild(celda(registro.codigo || '—'));
+        fila.appendChild(celda(doc || '—'));
+        fila.appendChild(celda(cod || '—'));
         fila.appendChild(celda(registro.marca + ' · ' + registro.color));
 
         const celdaOrigen = document.createElement('td');

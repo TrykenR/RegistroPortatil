@@ -93,8 +93,13 @@ public class RegistroEstudianteServlet extends HttpServlet {
                     + JsonUtil.campo("idEstudiante", idEstudiante) + "}");
 
         } catch (java.sql.SQLIntegrityConstraintViolationException e) {
+            String msg = (e.getMessage() != null) ? e.getMessage().toLowerCase() : "";
             respuesta.setStatus(HttpServletResponse.SC_CONFLICT);
-            salida.print(JsonUtil.error("Ese documento o código ya está registrado en el sistema."));
+            if (msg.contains("null") || msg.contains("cannot be null")) {
+                salida.print(JsonUtil.error("Error en la estructura de datos: campo obligatorio vacío en base de datos."));
+            } else {
+                salida.print(JsonUtil.error("Ese documento o código ya está registrado en el sistema."));
+            }
         } catch (Exception e) {
             getServletContext().log("Error registrando estudiante", e);
             respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
