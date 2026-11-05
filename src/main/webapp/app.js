@@ -157,9 +157,10 @@ const estado = {
   selectedColor: '',
   historyDepth: 0,
   pinIngresado: '',
-  pinModo: 'verificar', // 'verificar' | 'configurar' | 'confirmar_config'
+  pinModo: 'verificar', // 'verificar' | 'configurar' | 'confirmar_config' | 'salida_temprana'
   pinNuevoTemporal: '',
-  datosPendientesPin: null
+  datosPendientesPin: null,
+  equipoPendientePin: null
 };
 
 const $ = (s) => document.querySelector(s);
@@ -398,17 +399,7 @@ function aplicarEstadoEstudiante(datos) {
     return;
   }
 
-  // Verificación o configuración de PIN
-  if (datos.tienePin === false) {
-    // Caso: estudiante ya registrado pero aún no ha configurado su PIN
-    abrirPantallaConfigurarPin(datos);
-    return;
-  } else if (datos.tienePin === true) {
-    // Caso: estudiante con PIN existente -> validar antes de mostrar equipos
-    abrirPantallaVerificarPin(datos);
-    return;
-  }
-
+  // Acceso directo a los equipos registrados (se retira la solicitud obligatoria de PIN al loguearse)
   continuarSegunEstado(datos);
 }
 
@@ -426,13 +417,13 @@ function continuarSegunEstado(datos) {
 }
 
 /* ============ PIN HANDLING ============ */
-function abrirPantallaVerificarPin(datos) {
-  estado.datosPendientesPin = datos;
-  estado.pinModo = 'verificar';
+function abrirPantallaPinSalidaTemprana(equipo, mensaje, minutos) {
+  estado.equipoPendientePin = equipo;
+  estado.pinModo = 'salida_temprana';
   estado.pinIngresado = '';
-  $('#subtitulo-pin').textContent = 'Seguridad de portería';
+  $('#subtitulo-pin').textContent = 'Confirmación de Salida Rápida';
   $('#titulo-pin').textContent = 'Ingresa tu PIN';
-  $('#desc-pin').textContent = 'Digita tus 4 números para autorizar tu paso.';
+  $('#desc-pin').textContent = mensaje || 'Has ingresado hace menos de 45 minutos. Digita tu PIN para autorizar la salida.';
   mostrarError('#error-pin', '');
   actualizarPinDots();
   avanzarA('pantalla-pin');
@@ -489,6 +480,27 @@ function onPinLimpiar() {
 
 async function procesarPinCompleto() {
   const pin = estado.pinIngresado;
+
+  if (estado.pinModo === 'salida_temprana') {
+    if (!estado.equipoPendientePin) {
+      retroceder();
+      return;
+    }
+    // Reintentar registrar acceso enviando el PIN
+    const eq = estado.equipoPendientePin;
+    estado.pinIngresado = '';
+    actualizarPinDots();
+    try {
+      await registrarAcceso(eq, null, pin);
+    } catch (e) {
+      mostrarError('#error-pin', e.message || 'PIN incorrecto.');
+      const dotContainer = $('#pin-dots-container');
+      dotContainer.classList.remove('animate-shake');
+      void dotContainer.offsetWidth;
+      dotContainer.classList.add('animate-shake');
+    }
+    return;
+  }
 
   if (estado.pinModo === 'verificar') {
     // Si estamos sin conexión y hay perfil guardado localmente, permitir paso o validar
@@ -847,7 +859,7 @@ function pintarEquipos(dispositivos) {
 }
 
 /* Register movement (online vs offline) */
-async function registrarAcceso(equipo, botonTocado) {
+async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
   document.querySelectorAll('.laptop-item-btn').forEach((b) => (b.disabled = true));
   if (botonTocado) {
     botonTocado.classList.add('busy');
@@ -857,13 +869,25 @@ async function registrarAcceso(equipo, botonTocado) {
   const fechaEvento = horaActual.toISOString().slice(0, 19);
 
   try {
-    const cuerpo = new URLSearchParams({
+    const params = {
       idEstudiante: estado.idEstudiante,
       idDispositivo: equipo.id
-    });
+    };
+    if (pinConfirmado) {
+      params.pin = pinConfirmado;
+    }
+    const cuerpo = new URLSearchParams(params);
 
     const respuesta = await fetch(BASE_API + '/accesos', conCabecerasNgrok({ method: 'POST', body: cuerpo }));
     const datos = await respuesta.json();
+
+    // Caso: Salida anticipada requiere PIN
+    if (datos.requierePin) {
+      document.querySelectorAll('.laptop-item-btn').forEach((b) => (b.disabled = false));
+      if (botonTocado) botonTocado.classList.remove('busy');
+      abrirPantallaPinSalidaTemprana(equipo, datos.mensaje, datos.minutosTranscurridos);
+      return;
+    }
 
     if (!datos.ok && !datos.alerta) {
       throw new Error(datos.mensaje || 'No se pudo registrar.');

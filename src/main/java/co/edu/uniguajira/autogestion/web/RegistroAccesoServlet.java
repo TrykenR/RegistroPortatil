@@ -1,6 +1,7 @@
 package co.edu.uniguajira.autogestion.web;
 
 import co.edu.uniguajira.autogestion.dao.DispositivoDAO;
+import co.edu.uniguajira.autogestion.dao.EstudianteDAO;
 import co.edu.uniguajira.autogestion.dao.HistorialAccesoDAO;
 import co.edu.uniguajira.autogestion.modelo.Dispositivo;
 import co.edu.uniguajira.autogestion.modelo.HistorialAcceso;
@@ -20,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 public class RegistroAccesoServlet extends HttpServlet {
 
     private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
+    private final EstudianteDAO estudianteDAO = new EstudianteDAO();
     private final HistorialAccesoDAO historialAccesoDAO = new HistorialAccesoDAO();
 
     @Override
@@ -36,6 +38,7 @@ public class RegistroAccesoServlet extends HttpServlet {
                 request.getParameter("idDispositivo") : request.getParameter("id_dispositivo");
 
         String fechaEventoParam = request.getParameter("fechaEvento");
+        String pinParam = request.getParameter("pin");
 
         if (idEstudianteParam == null || idDispositivoParam == null) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -89,8 +92,29 @@ public class RegistroAccesoServlet extends HttpServlet {
 
             if (!sig.permitido) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                out.printf("{\"ok\":false,\"mensaje\":\"Debes esperar un momento antes de registrar otro movimiento.\"}", sig.minutosTranscurridos);
+                out.print("{\"ok\":false,\"mensaje\":\"Debes esperar un momento antes de registrar otro movimiento.\"}");
                 return;
+            }
+
+            // Si es salida antes de 45 minutos y requiere PIN:
+            if (sig.requierePin) {
+                if (pinParam == null || pinParam.isBlank()) {
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    out.printf("{\"ok\":false,\"requierePin\":true,\"minutosTranscurridos\":%d,\"mensaje\":\"Para registrar salida antes de 45 minutos ingresa tu PIN de seguridad.\"}",
+                            sig.minutosTranscurridos != null ? sig.minutosTranscurridos : 0);
+                    return;
+                }
+
+                // Verificar el PIN del estudiante
+                EstudianteDAO.ResultadoPin resPin = estudianteDAO.verificarPin(idEstudiante, pinParam.trim());
+                if (resPin != EstudianteDAO.ResultadoPin.CORRECTO && resPin != EstudianteDAO.ResultadoPin.NO_TIENE_PIN) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    String msg = (resPin == EstudianteDAO.ResultadoPin.BLOQUEADO) 
+                            ? "Demasiados intentos fallidos. PIN bloqueado temporalmente por 15 minutos."
+                            : "PIN incorrecto. Inténtalo de nuevo.";
+                    out.printf("{\"ok\":false,\"errorPin\":true,\"mensaje\":\"%s\"}", msg);
+                    return;
+                }
             }
 
             // 7. Registrar usando el POJO HistorialAcceso

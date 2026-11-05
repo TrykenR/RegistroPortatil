@@ -648,8 +648,28 @@ function celda(texto) {
 
 function formatearFecha(fechaIso) {
     if (!fechaIso) return '—';
+    // Si viene como "YYYY-MM-DD HH:mm:ss" desde el servidor en zona Colombia,
+    // se formatea directamente para evitar que el navegador aplique doble compensación
+    const partes = fechaIso.trim().split(/[\sT]+/);
+    if (partes.length >= 2) {
+        const fechaPartes = partes[0].split('-');
+        const horaPartes = partes[1].split(':');
+        if (fechaPartes.length === 3 && horaPartes.length >= 2) {
+            const anio = fechaPartes[0];
+            const mes = fechaPartes[1];
+            const dia = fechaPartes[2];
+            let hora = parseInt(horaPartes[0], 10);
+            const minuto = horaPartes[1];
+            const ampm = hora >= 12 ? 'p. m.' : 'a. m.';
+            hora = hora % 12;
+            if (hora === 0) hora = 12;
+            const horaStr = hora < 10 ? '0' + hora : hora;
+            return `${dia}/${mes}/${anio}, ${horaStr}:${minuto} ${ampm}`;
+        }
+    }
     const fecha = new Date(fechaIso.replace(' ', 'T'));
-    return fecha.toLocaleString('es-CO', {
+    return isNaN(fecha.getTime()) ? fechaIso : fecha.toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
     });

@@ -40,11 +40,17 @@ public class HistorialAccesoDAO {
         public final int movimiento;
         public final boolean permitido;
         public final Long minutosTranscurridos;   // null si es el primer registro del día
+        public final boolean requierePin;         // true si es salida antes del tiempo prudente (45 min)
 
         public ResultadoSiguienteMovimiento(int movimiento, boolean permitido, Long minutosTranscurridos) {
+            this(movimiento, permitido, minutosTranscurridos, false);
+        }
+
+        public ResultadoSiguienteMovimiento(int movimiento, boolean permitido, Long minutosTranscurridos, boolean requierePin) {
             this.movimiento = movimiento;
             this.permitido = permitido;
             this.minutosTranscurridos = minutosTranscurridos;
+            this.requierePin = requierePin;
         }
     }
 
@@ -124,7 +130,12 @@ public class HistorialAccesoDAO {
                     }
 
                     int siguiente = (ultimoMovimiento == ENTRADA) ? SALIDA : ENTRADA;
-                    return new ResultadoSiguienteMovimiento(siguiente, true, segundos / 60);
+                    long minutos = segundos / 60;
+                    // Si el siguiente movimiento es SALIDA y han pasado menos de 45 minutos desde la ENTRADA,
+                    // se requiere confirmación con PIN del estudiante por seguridad
+                    boolean salidaTemprana = (siguiente == SALIDA && minutos < 45);
+
+                    return new ResultadoSiguienteMovimiento(siguiente, true, minutos, salidaTemprana);
                 }
             }
         }

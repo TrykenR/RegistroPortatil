@@ -44,7 +44,7 @@ public class ConexionBD {
                 }
 
                 String urlJdbc = String.format(
-                    "jdbc:mysql://%s:%d/%s?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota",
+                    "jdbc:mysql://%s:%d/%s?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota&sessionVariables=time_zone='-05:00'",
                     host, puerto, bd
                 );
                 return DriverManager.getConnection(urlJdbc, usuario, clave);
@@ -61,7 +61,7 @@ public class ConexionBD {
         String clave = System.getenv("MYSQLPASSWORD") != null ? System.getenv("MYSQLPASSWORD") : "";
 
         String url = String.format(
-            "jdbc:mysql://%s:%s/%s?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota",
+            "jdbc:mysql://%s:%s/%s?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota&sessionVariables=time_zone='-05:00'",
             host, puerto, bd
         );
         return DriverManager.getConnection(url, usuario, clave);
