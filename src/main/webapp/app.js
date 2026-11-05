@@ -399,7 +399,17 @@ function aplicarEstadoEstudiante(datos) {
     return;
   }
 
-  // Acceso directo a los equipos registrados (se retira la solicitud obligatoria de PIN al loguearse)
+  // Verificación o configuración obligatoria de PIN de seguridad al ingresar
+  if (datos.tienePin === false) {
+    // Estudiante existente que aún no configuró su PIN
+    abrirPantallaConfigurarPin(datos);
+    return;
+  } else if (datos.tienePin === true) {
+    // Estudiante con PIN -> validar antes de mostrar sus portátiles
+    abrirPantallaVerificarPin(datos);
+    return;
+  }
+
   continuarSegunEstado(datos);
 }
 
@@ -417,6 +427,18 @@ function continuarSegunEstado(datos) {
 }
 
 /* ============ PIN HANDLING ============ */
+function abrirPantallaVerificarPin(datos) {
+  estado.datosPendientesPin = datos;
+  estado.pinModo = 'verificar';
+  estado.pinIngresado = '';
+  $('#subtitulo-pin').textContent = 'Seguridad de portería';
+  $('#titulo-pin').textContent = 'Ingresa tu PIN';
+  $('#desc-pin').textContent = 'Digita tus 4 números para autorizar tu paso.';
+  mostrarError('#error-pin', '');
+  actualizarPinDots();
+  avanzarA('pantalla-pin');
+}
+
 function abrirPantallaPinSalidaTemprana(equipo, mensaje, minutos) {
   estado.equipoPendientePin = equipo;
   estado.pinModo = 'salida_temprana';

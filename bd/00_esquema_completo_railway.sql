@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS Estudiantes (
     acepto_tratamiento_datos BOOLEAN NOT NULL DEFAULT FALSE,
     fecha_aceptacion_datos  DATETIME NULL,
     pin_hash                VARCHAR(128) NULL,
+    tiene_pin               BOOLEAN GENERATED ALWAYS AS (pin_hash IS NOT NULL AND CHAR_LENGTH(pin_hash) > 0) VIRTUAL,
     intentos_pin_fallidos   TINYINT UNSIGNED NOT NULL DEFAULT 0,
     bloqueado_hasta         DATETIME NULL,
     activo                  BOOLEAN  NOT NULL DEFAULT TRUE,

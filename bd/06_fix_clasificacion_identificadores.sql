@@ -25,7 +25,25 @@ SET numero_documento = codigo_estudiantil,
 WHERE codigo_estudiantil NOT LIKE '0%' 
   AND (numero_documento IS NULL OR numero_documento = '');
 
--- 5. Recrear Vista_Historial_Accesos para asegurar consistencia
+-- 5. Agregar columna generada virtual 'tiene_pin' para compatibilidad total con queries directos (MySQL 8 defensivo)
+SET @col_existe := (
+    SELECT COUNT(*) 
+    FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'Estudiantes' 
+      AND COLUMN_NAME = 'tiene_pin'
+);
+
+SET @sql_tiene_pin := IF(@col_existe = 0,
+    'ALTER TABLE Estudiantes ADD COLUMN tiene_pin BOOLEAN GENERATED ALWAYS AS (pin_hash IS NOT NULL AND CHAR_LENGTH(pin_hash) > 0) VIRTUAL;',
+    'SELECT "Columna tiene_pin ya existe" AS aviso;'
+);
+
+PREPARE stmt_tiene_pin FROM @sql_tiene_pin;
+EXECUTE stmt_tiene_pin;
+DEALLOCATE PREPARE stmt_tiene_pin;
+
+-- 6. Recrear Vista_Historial_Accesos para asegurar consistencia
 CREATE OR REPLACE VIEW Vista_Historial_Accesos AS
 SELECT  h.id_registro,
         e.numero_documento,

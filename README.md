@@ -1,6 +1,6 @@
-# Sistema de Autogestion de Registro de Portatiles
+# Sistema de Autogestion de Registro de Portatiles (v1.1)
 
-Sistema web con arquitectura Offline-First (PWA) disenado para agilizar el ingreso de equipos portatiles en la Universidad de La Guajira mediante codigo QR.
+Sistema web con arquitectura Offline-First (PWA) disenado para agilizar el ingreso de equipos portatiles en la Universidad de La Guajira mediante codigo QR o identificacion estudiantil.
 
 ---
 
