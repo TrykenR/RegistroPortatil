@@ -180,7 +180,7 @@ async function pedir(rutaRelativa, init = {}) {
   }
   const datos = await resp.json();
   if (!resp.ok) {
-    throw new Error(datos.mensaje || 'Error en el servidor.');
+    throw new Error(datos.error || datos.mensaje || 'Error en el servidor.');
   }
   return datos;
 }
