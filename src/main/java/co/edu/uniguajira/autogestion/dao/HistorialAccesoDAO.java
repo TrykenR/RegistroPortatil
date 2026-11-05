@@ -29,7 +29,7 @@ public class HistorialAccesoDAO {
      * para permitir alternar entre ENTRADA y SALIDA con fluidez sin bloquear
      * por 45 minutos.
      */
-    private static final int MINUTOS_MINIMOS_ENTRE_MOVIMIENTOS = 0;
+    //private static final int MINUTOS_MINIMOS_ENTRE_MOVIMIENTOS = 0;
 
     /**
      * Resultado de mirar el último movimiento de un dispositivo: qué
@@ -103,21 +103,28 @@ public class HistorialAccesoDAO {
     public ResultadoSiguienteMovimiento calcularSiguienteMovimiento(
             int idDispositivo, java.time.LocalDateTime fechaEventoNuevo) throws SQLException {
 
+        // Se usa DATE(?) con la fecha del evento para evitar desfases de zona horaria entre servidor y cliente
         String sql = "SELECT id_tipo_movimiento, fecha_hora_evento " +
                      "  FROM Historial_Accesos " +
-                     " WHERE id_dispositivo = ? AND DATE(fecha_hora_evento) = CURDATE() " +
-                     " ORDER BY fecha_hora_evento DESC LIMIT 1";
+                     " WHERE id_dispositivo = ? AND DATE(fecha_hora_evento) = DATE(?) " +
+                     " ORDER BY fecha_hora_evento DESC, id_registro DESC LIMIT 1";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);
+            ps.setTimestamp(2, java.sql.Timestamp.valueOf(fechaEventoNuevo != null ? fechaEventoNuevo : java.time.LocalDateTime.now()));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int ultimoMovimiento = rs.getInt("id_tipo_movimiento");
                     java.time.LocalDateTime ultimaFecha = rs.getTimestamp("fecha_hora_evento").toLocalDateTime();
-                    long minutos = java.time.Duration.between(ultimaFecha, fechaEventoNuevo).toMinutes();
+                    long segundos = java.time.Duration.between(ultimaFecha, fechaEventoNuevo != null ? fechaEventoNuevo : java.time.LocalDateTime.now()).getSeconds();
+                    
+                    // Si el toque ocurre en menos de 5 segundos se marca no permitido (antirrebote)
+                    if (segundos < 5 && segundos >= 0) {
+                        return new ResultadoSiguienteMovimiento(ultimoMovimiento, false, 0L);
+                    }
+
                     int siguiente = (ultimoMovimiento == ENTRADA) ? SALIDA : ENTRADA;
-                    boolean permitido = minutos >= MINUTOS_MINIMOS_ENTRE_MOVIMIENTOS;
-                    return new ResultadoSiguienteMovimiento(siguiente, permitido, minutos);
+                    return new ResultadoSiguienteMovimiento(siguiente, true, segundos / 60);
                 }
             }
         }
