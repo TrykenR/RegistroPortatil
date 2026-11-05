@@ -21,7 +21,7 @@ public class EstudianteDAO {
         String sql =
             "SELECT id_estudiante, numero_documento, codigo_estudiantil, " +
             "       CONCAT(COALESCE(nombres,''), ' ', COALESCE(apellidos,'')) AS nombre_completo, " +
-            "       acepto_tratamiento_datos " +
+            "       acepto_tratamiento_datos, pin_hash " +
             "  FROM Estudiantes " +
             " WHERE (numero_documento = ? OR codigo_estudiantil = ?) " +
             " LIMIT 1";
@@ -34,13 +34,16 @@ public class EstudianteDAO {
             
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
+                    String pinHash = rs.getString("pin_hash");
+                    boolean tienePin = (pinHash != null && !pinHash.isBlank());
+
                     return new Estudiante(
                             rs.getInt("id_estudiante"),
                             rs.getString("numero_documento"),
                             rs.getString("codigo_estudiantil"),
                             rs.getString("nombre_completo"),
                             rs.getBoolean("acepto_tratamiento_datos"),
-                            false // tienePin
+                            tienePin
                     );
                 }
             }
@@ -61,8 +64,8 @@ public class EstudianteDAO {
     public int registrar(String numeroDocumento, String codigoEstudiantil, String nombres,
                          String apellidos, boolean aceptoTratamiento, String pin) throws SQLException {
         String sql = "INSERT INTO Estudiantes " +
-                     "(numero_documento, codigo_estudiantil, nombres, apellidos, acepto_tratamiento_datos, fecha_aceptacion_datos) " +
-                     "VALUES (?,?,?,?,?,NOW())";
+                     "(numero_documento, codigo_estudiantil, nombres, apellidos, acepto_tratamiento_datos, fecha_aceptacion_datos, pin_hash) " +
+                     "VALUES (?,?,?,?,?,NOW(),?)";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
             
@@ -81,6 +84,12 @@ public class EstudianteDAO {
             ps.setString(3, nombres);
             ps.setString(4, apellidos);
             ps.setBoolean(5, aceptoTratamiento);
+            
+            if (pin != null && !pin.isBlank() && pin.matches("\\d{4}")) {
+                ps.setString(6, hashearPin(pin.trim()));
+            } else {
+                ps.setNull(6, java.sql.Types.VARCHAR);
+            }
             
             ps.executeUpdate();
             try (ResultSet claves = ps.getGeneratedKeys()) {
