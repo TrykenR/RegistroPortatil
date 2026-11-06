@@ -399,7 +399,7 @@ async function continuarConDocumento() {
   try {
     const datos = await pedir('/estudiante?identificador=' + encodeURIComponent(doc));
 
-    if (datos.estado === 'FRECUENTE') {
+    if (datos.estado === 'FRECUENTE' || datos.idEstudiante) {
       try { await self.BDOffline.guardarPerfil(doc, datos); } catch (e) { /* ignore */ }
     }
     aplicarEstadoEstudiante(datos);
@@ -1690,8 +1690,52 @@ function iniciar() {
   });
   window.addEventListener('offline', actualizarBarraEstado);
 
+  // Alternador de tema manual
+  iniciarControlTema();
+
   // Inicializar botón y comportamiento de Guía de uso
   iniciarGuiaDeUso();
+}
+
+/* =====================================================================
+   CONTROL DE TEMA (CLARO / OSCURO)
+   ===================================================================== */
+const SVG_LUNA = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+const SVG_SOL = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+
+function obtenerTemaActual() {
+  const guardado = localStorage.getItem('autogestion-tema');
+  if (guardado === 'dark' || guardado === 'light') return guardado;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function aplicarTema(tema) {
+  document.documentElement.setAttribute('data-theme', tema);
+  localStorage.setItem('autogestion-tema', tema);
+
+  // Actualizar meta theme-color para navegadores móviles
+  const color = tema === 'dark' ? '#16120F' : '#FAF8F5';
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', color));
+
+  // Actualizar icono en todos los botones de tema del DOM
+  const esOscuro = tema === 'dark';
+  document.querySelectorAll('[data-alternar-tema]').forEach(btn => {
+    btn.innerHTML = esOscuro ? SVG_SOL : SVG_LUNA;
+    btn.setAttribute('aria-label', esOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    btn.setAttribute('title', esOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+  });
+}
+
+function alternarTema() {
+  const actual = obtenerTemaActual();
+  aplicarTema(actual === 'dark' ? 'light' : 'dark');
+}
+
+function iniciarControlTema() {
+  aplicarTema(obtenerTemaActual());
+  document.querySelectorAll('[data-alternar-tema]').forEach(btn => {
+    btn.addEventListener('click', alternarTema);
+  });
 }
 
 /* =====================================================================

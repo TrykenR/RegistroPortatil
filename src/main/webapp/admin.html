@@ -10,6 +10,8 @@
 <link rel="preload" href="fuentes/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="admin.css">
+<!-- Anti-FOUT: aplica tema antes del primer pintado -->
+<script>(function(){var t=localStorage.getItem('autogestion-tema');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body class="cuerpo-admin">
 
@@ -106,6 +108,8 @@
       </div>
 
       <div class="dash-header-actions">
+        <button id="btn-tema-admin" type="button" class="btn-tema" aria-label="Cambiar tema" title="Modo claro / oscuro">
+        </button>
         <span class="session-pill">
           <span class="session-dot"></span>
           <span>admin · cierra en <b id="temporizador-sesion">30:00</b></span>

@@ -130,6 +130,9 @@ async function iniciar() {
         }
     });
 
+    // Inicializar control de tema en admin
+    iniciarControlTemaAdmin();
+
     // Si ya hay una sesión viva (el navegador manda la cookie sola),
     // /api/admin/historial responde bien y saltamos directo al panel
     // sin pedir usuario/clave de nuevo.
@@ -1109,6 +1112,42 @@ function mostrarError(idElemento, mensaje) {
     const elemento = $(idElemento);
     elemento.textContent = mensaje;
     elemento.hidden = !mensaje;
+}
+
+/* =====================================================================
+   CONTROL DE TEMA ADMIN (CLARO / OSCURO)
+   ===================================================================== */
+const SVG_LUNA_ADMIN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+const SVG_SOL_ADMIN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+
+function obtenerTemaActualAdmin() {
+    const guardado = localStorage.getItem('autogestion-tema');
+    if (guardado === 'dark' || guardado === 'light') return guardado;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function aplicarTemaAdmin(tema) {
+    document.documentElement.setAttribute('data-theme', tema);
+    localStorage.setItem('autogestion-tema', tema);
+
+    const color = tema === 'dark' ? '#16120F' : '#FAF8F5';
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', color));
+
+    const btn = $('#btn-tema-admin');
+    if (btn) {
+        const esOscuro = tema === 'dark';
+        btn.innerHTML = esOscuro ? SVG_SOL_ADMIN : SVG_LUNA_ADMIN;
+        btn.setAttribute('aria-label', esOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+        btn.setAttribute('title', esOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro');
+    }
+}
+
+function iniciarControlTemaAdmin() {
+    aplicarTemaAdmin(obtenerTemaActualAdmin());
+    $('#btn-tema-admin')?.addEventListener('click', () => {
+        const actual = obtenerTemaActualAdmin();
+        aplicarTemaAdmin(actual === 'dark' ? 'light' : 'dark');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', iniciar);

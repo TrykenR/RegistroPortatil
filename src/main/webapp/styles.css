@@ -117,6 +117,95 @@
   }
 }
 
+/* =====================================================================
+   TEMA MANUAL — anula prefers-color-scheme cuando el usuario elige
+   Especificidad mayor que @media, declarado después → gana siempre.
+   ===================================================================== */
+[data-theme="light"] {
+  color-scheme: light;
+  --papel: #FAF8F5;
+  --cont: #F2F1EF;
+  --borde: #DEDAD3;
+  --borde-fuerte: #C8C2B8;
+  --sub: #6B655C;
+  --tinta: #241C16;
+  --superficie: #FFFFFF;
+  --coral: #CC5C50;
+  --coral-dark: #A8473C;
+  --coral-hover: #B84E43;
+  --coral-texto: #A8473C;
+  --coral-soft: #F9E4E0;
+  --teal: #2B8496;
+  --teal-dark: #1F6574;
+  --teal-soft: #DFEFF3;
+  --oro-dark: #9A6A1C;
+  --oro-soft: #FBEFD8;
+  --aviso: #B3261E;
+  --aviso-soft: rgba(179, 38, 30, 0.12);
+  --solido: #241C16;
+  --solido-hover: #000000;
+  --sobre-solido: #FFFFFF;
+  --encabezado: #241C16;
+  --sombra-suave: 0 1px 2px rgba(36,28,22,0.05), 0 4px 14px -6px rgba(36,28,22,0.12);
+  --fondo-escritorio: #EBE6DF;
+  --fondo-escritorio-claro: #F3EFE9;
+  --fondo-escritorio-oscuro: #E3DDD4;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --papel: #16120F;
+  --cont: #241E19;
+  --borde: #3A322B;
+  --borde-fuerte: #4D443B;
+  --sub: #A89F93;
+  --tinta: #F3EEE7;
+  --superficie: #1D1814;
+  --coral: #D4675B;
+  --coral-dark: #9E443A;
+  --coral-hover: #DC766A;
+  --coral-texto: #F0A096;
+  --coral-soft: rgba(212,103,91,0.18);
+  --teal: #4BA3B5;
+  --teal-dark: #8CCAD8;
+  --teal-soft: rgba(75,163,181,0.18);
+  --oro-dark: #E9B76A;
+  --oro-soft: rgba(225,161,64,0.16);
+  --aviso: #F28B82;
+  --aviso-soft: rgba(242,139,130,0.16);
+  --solido: #F3EEE7;
+  --solido-hover: #FFFFFF;
+  --sobre-solido: #16120F;
+  --encabezado: #0F0C0A;
+  --sombra-suave: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px -6px rgba(0,0,0,0.5);
+  --fondo-escritorio: #0E0B09;
+  --fondo-escritorio-claro: #1A1511;
+  --fondo-escritorio-oscuro: #0A0807;
+}
+
+/* =====================================================================
+   BOTÓN TOGGLE DE TEMA  ☀ / 🌙
+   ===================================================================== */
+.btn-tema {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tinta);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.btn-tema:hover {
+  background: var(--cont);
+}
+.btn-tema svg {
+  pointer-events: none;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;

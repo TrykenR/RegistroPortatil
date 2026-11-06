@@ -98,14 +98,14 @@ public class RegistroAccesoServlet extends HttpServlet {
             HistorialAccesoDAO.ResultadoSiguienteMovimiento sig = 
                     historialAccesoDAO.calcularSiguienteMovimiento(idDispositivo, fechaEvento);
 
-            if (!sig.permitido) {
+            if (!sig.permitido && !esSincronizacionOffline) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.print("{\"ok\":false,\"mensaje\":\"Debes esperar un momento antes de registrar otro movimiento.\"}");
                 return;
             }
 
-            // Si es salida antes de 45 minutos y requiere PIN:
-            if (sig.requierePin) {
+            // Si es salida antes de 45 minutos y requiere PIN (solo aplica en vivo, offline se respeta la marca del cel):
+            if (sig.requierePin && !esSincronizacionOffline) {
                 if (pinParam == null || pinParam.isBlank()) {
                     response.setStatus(HttpServletResponse.SC_OK);
                     out.printf("{\"ok\":false,\"requierePin\":true,\"minutosTranscurridos\":%d,\"mensaje\":\"Para registrar salida antes de 45 minutos ingresa tu PIN de seguridad.\"}",
