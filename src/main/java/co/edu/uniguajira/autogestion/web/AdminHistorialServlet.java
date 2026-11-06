@@ -96,8 +96,8 @@ public class AdminHistorialServlet extends HttpServlet {
             long totalRegistros = contarTotal(cn, condiciones.toString(), parametros);
 
             String sqlPagina =
-                "SELECT id_registro, numero_documento, codigo_estudiantil, estudiante, " +
-                "       marca, color, movimiento, origen, " +
+                "SELECT id_registro, id_dispositivo, numero_documento, codigo_estudiantil, estudiante, " +
+                "       numero_serie, descripcion, reportado_hurto, marca, color, movimiento, origen, " +
                 "       fecha_hora_evento, fecha_hora_sincronizado, segundos_de_retraso " +
                 "  FROM Vista_Historial_Accesos" + condiciones +
                 " ORDER BY fecha_hora_evento DESC LIMIT ? OFFSET ?";
@@ -123,11 +123,22 @@ public class AdminHistorialServlet extends HttpServlet {
                             cod = null;
                         }
 
+                        String serial = rs.getString("numero_serie");
+                        if (serial == null || serial.isBlank()) {
+                            serial = "Desconocido";
+                        }
+                        String desc = rs.getString("descripcion");
+                        if (desc == null) desc = "";
+
                         filas.add("{"
                             + JsonUtil.campo("id", rs.getLong("id_registro")) + ","
+                            + JsonUtil.campo("idDispositivo", rs.getInt("id_dispositivo")) + ","
                             + JsonUtil.campo("documento", doc) + ","
                             + JsonUtil.campo("codigo", cod) + ","
                             + JsonUtil.campo("estudiante", rs.getString("estudiante")) + ","
+                            + JsonUtil.campo("serial", serial) + ","
+                            + JsonUtil.campo("descripcion", desc) + ","
+                            + JsonUtil.campo("reportadoHurto", rs.getBoolean("reportado_hurto")) + ","
                             + JsonUtil.campo("marca", rs.getString("marca")) + ","
                             + JsonUtil.campo("color", rs.getString("color")) + ","
                             + JsonUtil.campo("movimiento", rs.getString("movimiento")) + ","

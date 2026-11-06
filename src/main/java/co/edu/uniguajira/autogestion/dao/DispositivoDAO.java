@@ -175,13 +175,24 @@ public class DispositivoDAO {
 
     /**
      * Cancela o levanta el reporte de hurto de un equipo (equipo recuperado o reporte erróneo).
+     * También limpia las alertas de hurto activas en Alertas_Seguridad para este dispositivo.
      */
     public boolean levantarReporteHurto(int idDispositivo) throws SQLException {
-        String sql = "UPDATE Dispositivos_Estudiante SET reportado_hurto = FALSE, fecha_reporte_hurto = NULL, motivo_reporte = NULL WHERE id_dispositivo = ?";
-        try (Connection cn = ConexionBD.obtenerConexion();
-             PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setInt(1, idDispositivo);
-            return ps.executeUpdate() > 0;
+        String sqlDispositivo = "UPDATE Dispositivos_Estudiante SET reportado_hurto = FALSE, fecha_reporte_hurto = NULL, motivo_reporte = NULL WHERE id_dispositivo = ?";
+        String sqlEliminarAlerta = "DELETE FROM Alertas_Seguridad WHERE id_dispositivo = ? AND tipo_alerta = 'HURTO'";
+        try (Connection cn = ConexionBD.obtenerConexion()) {
+            cn.setAutoCommit(false);
+            int filasActualizadas = 0;
+            try (PreparedStatement psDisp = cn.prepareStatement(sqlDispositivo)) {
+                psDisp.setInt(1, idDispositivo);
+                filasActualizadas = psDisp.executeUpdate();
+            }
+            try (PreparedStatement psAlerta = cn.prepareStatement(sqlEliminarAlerta)) {
+                psAlerta.setInt(1, idDispositivo);
+                psAlerta.executeUpdate();
+            }
+            cn.commit();
+            return filasActualizadas > 0;
         }
     }
 

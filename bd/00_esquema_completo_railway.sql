@@ -161,9 +161,13 @@ WHERE   e.activo = TRUE AND de.activo = TRUE;
 -- Vista Historial de Accesos (Panel Admin)
 CREATE OR REPLACE VIEW Vista_Historial_Accesos AS
 SELECT  h.id_registro,
+        de.id_dispositivo,
         e.numero_documento,
         e.codigo_estudiantil,
         CONCAT(COALESCE(e.nombres,''), ' ', COALESCE(e.apellidos,'')) AS estudiante,
+        de.numero_serie,
+        de.alias AS descripcion,
+        de.reportado_hurto,
         m.nombre AS marca,
         c.nombre AS color,
         tm.nombre AS movimiento,
@@ -197,7 +201,8 @@ FROM    Alertas_Seguridad a
 JOIN    Dispositivos_Estudiante de ON de.id_dispositivo = a.id_dispositivo
 JOIN    Estudiantes e ON e.id_estudiante = de.id_estudiante
 JOIN    Marcas m  ON m.id_marca = de.id_marca
-JOIN    Colores c ON c.id_color = de.id_color;
+JOIN    Colores c ON c.id_color = de.id_color
+WHERE   (a.tipo_alerta <> 'HURTO' OR de.reportado_hurto = TRUE);
 
 -- =====================================================================
 -- DATOS SEMILLA / INICIALES

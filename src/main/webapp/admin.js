@@ -37,9 +37,11 @@ const AVISO_ANTES_MS     =  5 * 60 * 1000;
 let tiempoRestanteMs      = DURACION_SESION_MS;
 let intervaloTemporizador = null;
 
-// ── Monitoreo en tiempo real de nuevos registros (polling liviano cada 15s) ──
+// ── Monitoreo en tiempo real de nuevos registros y alertas (polling liviano cada 15s) ──
 let ultimoIdVisto = 0;
 let contadorNovedades = 0;
+let ultimoIdAlertaVisto = 0;
+let contadorNovedadesAlertas = 0;
 let intervaloMonitoreo = null;
 
 // Mismo motivo que en app.js: el plan gratuito de Ngrok intercepta la
@@ -115,7 +117,11 @@ async function iniciar() {
     });
     $('#boton-limpiar').addEventListener('click', limpiarFiltros);
     $('#boton-exportar').addEventListener('click', exportarCsv);
-    $('#boton-actualizar-alertas').addEventListener('click', cargarAlertas);
+    $('#boton-actualizar-alertas').addEventListener('click', () => {
+        resetearNovedadesAlertas();
+        cargarAlertas();
+        cargarResumen();
+    });
     $('#boton-ver-todas-alertas').addEventListener('click', () => {
         alertasExpandidas = !alertasExpandidas;
         pintarAlertas(ultimasAlertas);
@@ -226,6 +232,7 @@ function volverAlLogin(mensaje) {
     detenerTemporizador();
     detenerMonitoreoTiempoReal();
     resetearNovedades();
+    resetearNovedadesAlertas();
     // Restaura la restricción de scroll que tenía styles.css originalmente
     document.documentElement.style.overflow = '';
     document.documentElement.style.height = '';
@@ -441,20 +448,38 @@ function detenerMonitoreoTiempoReal() {
 async function verificarNovedadesTiempoReal() {
     if ($('#vista-panel').hidden) return;
     try {
-        const res = await fetch('api/admin/historial?pagina=1', conCabecerasNgrok());
-        if (!res.ok) return;
-        const datos = await res.json();
-        if (!datos.ok || !datos.registros || !datos.registros.length) return;
+        // 1. Verificar registros de historial nuevos
+        const resHistorial = await fetch('api/admin/historial?pagina=1', conCabecerasNgrok());
+        if (resHistorial.ok) {
+            const datosH = await resHistorial.json();
+            if (datosH.ok && datosH.registros && datosH.registros.length) {
+                const maxIdServidor = Number(datosH.registros[0].id) || 0;
+                if (ultimoIdVisto > 0 && maxIdServidor > ultimoIdVisto) {
+                    const nuevos = datosH.registros.filter((r) => Number(r.id) > ultimoIdVisto).length;
+                    contadorNovedades += nuevos;
+                    ultimoIdVisto = maxIdServidor;
+                    actualizarBadgeNovedades();
+                } else if (ultimoIdVisto === 0) {
+                    ultimoIdVisto = maxIdServidor;
+                }
+            }
+        }
 
-        const maxIdServidor = Number(datos.registros[0].id) || 0;
-        if (ultimoIdVisto > 0 && maxIdServidor > ultimoIdVisto) {
-            // Contar cuántos son nuevos
-            const nuevos = datos.registros.filter((r) => Number(r.id) > ultimoIdVisto).length;
-            contadorNovedades += nuevos;
-            ultimoIdVisto = maxIdServidor;
-            actualizarBadgeNovedades();
-        } else if (ultimoIdVisto === 0) {
-            ultimoIdVisto = maxIdServidor;
+        // 2. Verificar alertas de seguridad nuevas (ej. reporte de hurto)
+        const resAlertas = await fetch('api/admin/alertas', conCabecerasNgrok());
+        if (resAlertas.ok) {
+            const datosA = await resAlertas.json();
+            if (datosA.ok && Array.isArray(datosA.alertas)) {
+                const maxIdAlertaServidor = datosA.alertas.reduce((max, a) => Math.max(max, Number(a.idAlerta) || 0), 0);
+                if (ultimoIdAlertaVisto > 0 && maxIdAlertaServidor > ultimoIdAlertaVisto) {
+                    const nuevasAlertas = datosA.alertas.filter((a) => Number(a.idAlerta) > ultimoIdAlertaVisto).length;
+                    contadorNovedadesAlertas += nuevasAlertas;
+                    ultimoIdAlertaVisto = maxIdAlertaServidor;
+                    actualizarBadgeNovedadesAlertas();
+                } else if (ultimoIdAlertaVisto === 0) {
+                    ultimoIdAlertaVisto = maxIdAlertaServidor;
+                }
+            }
         }
     } catch (e) {
         // Ignorar fallas temporales de red en el polling
@@ -480,6 +505,31 @@ function actualizarBadgeNovedades() {
 function resetearNovedades() {
     contadorNovedades = 0;
     actualizarBadgeNovedades();
+}
+
+function actualizarBadgeNovedadesAlertas() {
+    const btn = $('#boton-actualizar-alertas');
+    const badge = $('#badge-novedades-alertas');
+    if (!btn) return;
+
+    if (contadorNovedadesAlertas > 0) {
+        btn.classList.add('tiene-novedades');
+        if (badge) {
+            badge.hidden = false;
+            badge.textContent = contadorNovedadesAlertas > 99 ? '99+' : String(contadorNovedadesAlertas);
+        }
+    } else {
+        btn.classList.remove('tiene-novedades');
+        if (badge) {
+            badge.hidden = true;
+            badge.textContent = '0';
+        }
+    }
+}
+
+function resetearNovedadesAlertas() {
+    contadorNovedadesAlertas = 0;
+    actualizarBadgeNovedadesAlertas();
 }
 
 /* ---------------------------------------------------------------
@@ -759,7 +809,7 @@ async function exportarCsv() {
 function descargarCsv(registros) {
     // Punto y coma: Excel en español lo abre en columnas sin configurar nada
     const SEPARADOR = ';';
-    const encabezados = ['Fecha', 'Movimiento', 'Estudiante', 'Documento', 'Código', 'Marca', 'Color', 'Origen', 'Retraso (s)'];
+    const encabezados = ['Fecha', 'Movimiento', 'Estudiante', 'Documento', 'Código', 'Marca', 'Color', 'Serial', 'Descripción / Alias', 'Origen', 'Retraso (s)'];
 
     const celdaCsv = (valor) => {
         let texto = valor === null || valor === undefined ? '' : String(valor);
@@ -776,6 +826,8 @@ function descargarCsv(registros) {
         r.codigo || '',
         r.marca,
         r.color,
+        r.serial || 'Desconocido',
+        r.descripcion || '',
         r.origen === 'OFFLINE_SINCRONIZADO' ? 'Offline sincronizado' : 'En línea',
         r.origen === 'OFFLINE_SINCRONIZADO' ? r.segundosRetraso : 0
     ].map(celdaCsv).join(SEPARADOR));
@@ -990,8 +1042,12 @@ function pintarAlertas(alertas) {
                             }));
                             const dat = await res.json();
                             alert(dat.mensaje || 'Alerta levantada exitosamente');
-                            cargarAlertas();
+                            // Limpiar de la lista local inmediatamente para feedback instantáneo
+                            ultimasAlertas = ultimasAlertas.filter((a) => a.idDispositivo !== alerta.idDispositivo);
+                            pintarAlertas(ultimasAlertas);
+                            await cargarAlertas();
                             cargarResumen();
+                            buscar();
                         } catch (e) {
                             alert('Error: ' + e.message);
                         } finally {
@@ -1145,7 +1201,7 @@ function pintarResultados(registros, totalRegistros) {
         : `${totalRegistros} registros encontrados.`;
 
     if (registros.length === 0) {
-        cuerpo.appendChild(filaVacia(7, 'portatil',
+        cuerpo.appendChild(filaVacia(9, 'portatil',
             'No hay registros que coincidan con estos filtros.',
             'Prueba con otro rango de fechas o limpia los filtros.'));
         return;
@@ -1172,6 +1228,30 @@ function pintarResultados(registros, totalRegistros) {
         fila.appendChild(celda(cod || '—'));
         fila.appendChild(celda(registro.marca + ' · ' + registro.color));
 
+        // Columna Serial y Detalle
+        const celdaDetalle = document.createElement('td');
+        const serialTxt = registro.serial || 'Desconocido';
+        const spanSerial = document.createElement('div');
+        spanSerial.style.fontWeight = '600';
+        spanSerial.style.fontSize = '12px';
+        spanSerial.textContent = serialTxt !== 'Desconocido' ? `SN: ${serialTxt}` : 'SN: Desconocido';
+        celdaDetalle.appendChild(spanSerial);
+
+        if (registro.descripcion) {
+            const spanDesc = document.createElement('div');
+            spanDesc.style.fontSize = '11px';
+            spanDesc.style.opacity = '0.75';
+            spanDesc.style.maxWidth = '180px';
+            spanDesc.style.overflow = 'hidden';
+            spanDesc.style.textOverflow = 'ellipsis';
+            spanDesc.style.whiteSpace = 'nowrap';
+            spanDesc.title = registro.descripcion;
+            spanDesc.textContent = registro.descripcion;
+            celdaDetalle.appendChild(spanDesc);
+        }
+        fila.appendChild(celdaDetalle);
+
+        // Origen
         const celdaOrigen = document.createElement('td');
         const chip = document.createElement('span');
         const esOffline = registro.origen === 'OFFLINE_SINCRONIZADO';
@@ -1181,6 +1261,54 @@ function pintarResultados(registros, totalRegistros) {
             : 'En línea';
         celdaOrigen.appendChild(chip);
         fila.appendChild(celdaOrigen);
+
+        // Columna Acción (Reportar hurto / Estado)
+        const celdaAccion = document.createElement('td');
+        if (registro.idDispositivo) {
+            if (registro.reportadoHurto) {
+                const tag = document.createElement('span');
+                tag.className = 'tag-hurto-activo';
+                tag.textContent = 'En alerta';
+                celdaAccion.appendChild(tag);
+            } else {
+                const btnHurto = document.createElement('button');
+                btnHurto.type = 'button';
+                btnHurto.className = 'btn-mini-alerta btn-mini-hurto';
+                btnHurto.title = 'Reportar este portátil como hurtado o extraviado';
+                btnHurto.textContent = 'Reportar hurto';
+                btnHurto.onclick = async () => {
+                    const motivo = prompt(`¿Motivo o detalle del reporte de hurto para el equipo ${registro.marca} (${registro.estudiante})?:`, 'Reportado extraviado/hurtado en portería');
+                    if (motivo !== null) {
+                        btnHurto.disabled = true;
+                        btnHurto.textContent = 'Reportando…';
+                        try {
+                            const res = await fetch('api/admin/alertas', conCabecerasNgrok({
+                                method: 'POST',
+                                body: new URLSearchParams({
+                                    accion: 'reportar_hurto',
+                                    idDispositivo: registro.idDispositivo,
+                                    motivo: motivo.trim() || 'Reportado desde panel admin'
+                                })
+                            }));
+                            const dat = await res.json();
+                            alert(dat.mensaje || 'Reporte registrado exitosamente');
+                            await cargarAlertas();
+                            cargarResumen();
+                            buscar();
+                        } catch (e) {
+                            alert('Error al reportar: ' + e.message);
+                        } finally {
+                            btnHurto.disabled = false;
+                            btnHurto.textContent = 'Reportar hurto';
+                        }
+                    }
+                };
+                celdaAccion.appendChild(btnHurto);
+            }
+        } else {
+            celdaAccion.textContent = '—';
+        }
+        fila.appendChild(celdaAccion);
 
         cuerpo.appendChild(fila);
     });
