@@ -348,6 +348,26 @@
         </label>
       </div>
 
+      <!-- Serial del portátil (opcional, si está vacío será "Desconocido") -->
+      <div class="field-group">
+        <label>
+          <span class="field-label">
+            Serial / Número de serie <span class="field-label-optional">opcional</span>
+          </span>
+          <input id="campo-serial" class="field-input" type="text" maxlength="50" placeholder="Ej. 5CD1234XYZ (o dejar vacío)">
+        </label>
+      </div>
+
+      <!-- Descripción identificativa (OBLIGATORIA) -->
+      <div class="field-group">
+        <label>
+          <span class="field-label">
+            Descripción / Señas particulares <strong style="color: var(--coral-base); font-size: 11px;">obligatorio</strong>
+          </span>
+          <textarea id="campo-descripcion" class="field-input" rows="2" maxlength="200" placeholder="Ej. Sticker de Batman en la tapa, fisura en bisagra izquierda, protector de teclado..."></textarea>
+        </label>
+      </div>
+
       <div id="error-equipo-nuevo" class="error-note error-note-spaced" style="display: none;"></div>
     </main>
 
@@ -483,8 +503,8 @@
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </span>
           <span class="hoja-accion-textos">
-            <strong>Reportar como hurtado / extraviado</strong>
-            <span>Genera alerta inmediata en portería</span>
+            <strong id="texto-reportar-hurto">Reportar como hurtado / extraviado</strong>
+            <span id="subtexto-reportar-hurto">Genera alerta inmediata en portería</span>
           </span>
         </button>
         <button id="boton-eliminar-equipo" type="button" class="hoja-accion hoja-accion-peligro">
@@ -499,8 +519,8 @@
       </div>
 
       <div id="hoja-equipo-confirmar-hurto" class="hoja-confirmar" hidden>
-        <p class="hoja-confirmar-titulo">¿Reportar como hurtado / extraviado?</p>
-        <p class="hoja-confirmar-texto">Se emitirá una alerta de seguridad inmediata en la portería y el equipo quedará bloqueado para autorizaciones.</p>
+        <p id="titulo-confirmar-hurto" class="hoja-confirmar-titulo">¿Reportar como hurtado / extraviado?</p>
+        <p id="texto-confirmar-hurto" class="hoja-confirmar-texto">Se emitirá una alerta de seguridad inmediata en la portería y el equipo quedará bloqueado para autorizaciones.</p>
         <button id="boton-confirmar-hurto" type="button" class="btn-peligro">Sí, reportar hurto</button>
       </div>
 

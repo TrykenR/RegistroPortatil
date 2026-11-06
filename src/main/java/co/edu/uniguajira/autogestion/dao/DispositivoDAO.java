@@ -165,7 +165,19 @@ public class DispositivoDAO {
      * de entradas y salidas ni las alertas de seguridad.
      */
     public boolean desactivar(int idDispositivo) throws SQLException {
-        String sql = "UPDATE Dispositivos_Estudiante SET activo = FALSE WHERE id_dispositivo = ? AND activo = TRUE";
+        String sql = "UPDATE Dispositivos_Estudiante SET activo = FALSE WHERE id_dispositivo = ?";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idDispositivo);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * Cancela o levanta el reporte de hurto de un equipo (equipo recuperado o reporte erróneo).
+     */
+    public boolean levantarReporteHurto(int idDispositivo) throws SQLException {
+        String sql = "UPDATE Dispositivos_Estudiante SET reportado_hurto = FALSE, fecha_reporte_hurto = NULL, motivo_reporte = NULL WHERE id_dispositivo = ?";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);

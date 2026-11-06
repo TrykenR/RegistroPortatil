@@ -905,10 +905,14 @@ function abrirPantallaEquipoNuevo(pantallaAnterior, esPrimeraVez = false, equipo
       $('#campo-otro-color').style.display = 'block';
     }
     $('#campo-alias').value = equipoEditar.alias || '';
+    if ($('#campo-serial')) $('#campo-serial').value = equipoEditar.numeroSerie || '';
+    if ($('#campo-descripcion')) $('#campo-descripcion').value = equipoEditar.descripcion || '';
   } else {
     estado.selectedBrand = 'Lenovo';
     estado.selectedColor = 'Gris';
     $('#campo-alias').value = '';
+    if ($('#campo-serial')) $('#campo-serial').value = '';
+    if ($('#campo-descripcion')) $('#campo-descripcion').value = '';
   }
 
   construirSelectorMarcas();
@@ -1021,9 +1025,18 @@ async function guardarEquipoYRegistrar() {
   let c = estado.selectedColor;
   if (c === 'Otra') c = $('#campo-otro-color').value.trim();
   const nick = $('#campo-alias').value.trim();
+  let serial = ($('#campo-serial')?.value || '').trim();
+  if (!serial) serial = 'Desconocido';
+  const descripcion = ($('#campo-descripcion')?.value || '').trim();
 
   if (!b || !c) {
     mostrarError('#error-equipo-nuevo', 'Elige la marca y el color de tu equipo.');
+    return;
+  }
+
+  if (!descripcion || descripcion.length < 5) {
+    mostrarError('#error-equipo-nuevo', 'La descripción o señas particulares del portátil es obligatoria (ej. sticker, raspón, funda) para poder diferenciarlo.');
+    $('#campo-descripcion')?.focus();
     return;
   }
 
@@ -1052,7 +1065,10 @@ async function guardarEquipoYRegistrar() {
       id_marca: idMarca,
       idColor,
       id_color: idColor,
-      alias: nick
+      alias: nick,
+      numeroSerie: serial,
+      numero_serie: serial,
+      descripcion: descripcion
     });
 
     const nuevo = await pedir('/dispositivos', { method: 'POST', body: cuerpo });
@@ -1062,6 +1078,9 @@ async function guardarEquipoYRegistrar() {
       marca: b,
       color: c,
       alias: nick,
+      numeroSerie: serial,
+      descripcion: descripcion,
+      reportadoHurto: false,
       ultimoMovimiento: 0,
       siguienteMovimiento: 'ENTRADA'
     };
@@ -1130,8 +1149,11 @@ async function guardarPerfilLocal() {
 }
 
 /* Step 4: My Laptops list */
-/** Estado del equipo según su último movimiento de hoy (1 = entrada, 2 = salida). */
+/** Estado del equipo según su último movimiento de hoy (1 = entrada, 2 = salida) o si está reportado por hurto. */
 function describirEstadoEquipo(equipo) {
+  if (equipo.reportadoHurto) {
+    return { clase: 'hurto', etiqueta: '⚠️ Reportado por hurto', accion: 'Equipo bloqueado por reporte de hurto' };
+  }
   const ultimo = Number(equipo.ultimoMovimiento) || 0;
   if (ultimo === 1) return { clase: 'adentro', etiqueta: 'Adentro', accion: 'Toca para registrar la salida' };
   if (ultimo === 2) return { clase: 'afuera', etiqueta: 'Afuera', accion: 'Toca para registrar la entrada' };
@@ -1163,11 +1185,11 @@ function pintarEquipos(dispositivos) {
     const estadoEquipo = describirEstadoEquipo(d);
 
     const li = document.createElement('li');
-    li.className = 'laptop-item animate-rise';
+    li.className = 'laptop-item animate-rise' + (d.reportadoHurto ? ' laptop-item-hurto' : '');
     li.style.animationDelay = `${i * 70}ms`;
 
     const btn = document.createElement('button');
-    btn.className = 'laptop-item-btn';
+    btn.className = 'laptop-item-btn' + (d.reportadoHurto ? ' laptop-btn-hurto' : '');
     btn.type = 'button';
     btn.setAttribute('aria-label', `${marca} ${color}${d.alias ? ', ' + d.alias : ''}. ${estadoEquipo.etiqueta}. ${estadoEquipo.accion}.`);
 
@@ -1261,6 +1283,11 @@ function activarPulsacionLarga(boton, alPulsarLargo) {
 
 /* Register movement (online vs offline) */
 async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
+  if (equipo.reportadoHurto) {
+    alert('Este equipo tiene un reporte de hurto activo y está bloqueado.\n\nSi recuperaste tu equipo, mantén pulsado sobre él o toca el botón de tres puntos para "Cancelar reporte de hurto".');
+    return;
+  }
+
   document.querySelectorAll('.laptop-item-btn').forEach((b) => (b.disabled = true));
   if (botonTocado) {
     botonTocado.classList.add('busy');
@@ -1508,6 +1535,13 @@ function abrirHojaEquipo(equipo, origen) {
   $('#boton-cerrar-hoja').textContent = 'Cancelar';
   mostrarError('#error-hoja-equipo', '');
 
+  // Ajustar textos según si ya está reportado por hurto
+  const esHurtado = Boolean(equipo.reportadoHurto);
+  const txtHurto = $('#texto-reportar-hurto');
+  const subHurto = $('#subtexto-reportar-hurto');
+  if (txtHurto) txtHurto.textContent = esHurtado ? 'Cancelar reporte de hurto' : 'Reportar como hurtado / extraviado';
+  if (subHurto) subHurto.textContent = esHurtado ? 'Habilitar equipo nuevamente (recuperado)' : 'Genera alerta inmediata en portería';
+
   // Editar o eliminar exige conexión y, si el estudiante tiene PIN, haberlo verificado.
   let aviso = '';
   if (!navigator.onLine) {
@@ -1517,7 +1551,7 @@ function abrirHojaEquipo(equipo, origen) {
   }
   $('#hoja-equipo-aviso').textContent = aviso;
   $('#hoja-equipo-aviso').hidden = !aviso;
-  $('#boton-editar-equipo').disabled = Boolean(aviso);
+  $('#boton-editar-equipo').disabled = Boolean(aviso) || esHurtado;
   $('#boton-reportar-hurto').disabled = Boolean(aviso);
   $('#boton-eliminar-equipo').disabled = Boolean(aviso);
 
@@ -1540,39 +1574,69 @@ function pedirConfirmacionEliminar() {
 }
 
 function pedirConfirmacionHurto() {
+  const equipo = estado.equipoAcciones;
+  const esHurtado = Boolean(equipo?.reportadoHurto);
+
   $('#hoja-equipo-acciones').hidden = true;
   $('#hoja-equipo-confirmar-hurto').hidden = false;
   $('#hoja-equipo-confirmar').hidden = true;
   $('#boton-cerrar-hoja').textContent = 'Cancelar';
+
+  const tit = $('#titulo-confirmar-hurto');
+  const txt = $('#texto-confirmar-hurto');
+  const btn = $('#boton-confirmar-hurto');
+
+  if (esHurtado) {
+    if (tit) tit.textContent = '¿Cancelar reporte de hurto?';
+    if (txt) txt.textContent = 'El equipo volverá a estar disponible para registrar entradas y salidas con normalidad.';
+    if (btn) {
+      btn.textContent = 'Sí, cancelar reporte';
+      btn.className = 'btn-primary';
+    }
+  } else {
+    if (tit) tit.textContent = '¿Reportar como hurtado / extraviado?';
+    if (txt) txt.textContent = 'Se emitirá una alerta de seguridad inmediata en la portería y el equipo quedará bloqueado para autorizaciones.';
+    if (btn) {
+      btn.textContent = 'Sí, reportar hurto';
+      btn.className = 'btn-peligro';
+    }
+  }
+
   $('#boton-confirmar-hurto').focus();
 }
 
 async function reportarHurtoSeleccionado() {
   const equipo = estado.equipoAcciones;
   if (!equipo) return;
+  const esHurtado = Boolean(equipo.reportadoHurto);
   const boton = $('#boton-confirmar-hurto');
   boton.disabled = true;
-  boton.textContent = 'Reportando…';
+  boton.textContent = esHurtado ? 'Cancelando reporte…' : 'Reportando…';
   mostrarError('#error-hoja-equipo', '');
 
   try {
     const cuerpo = new URLSearchParams({
       idDispositivo: equipo.id,
-      motivo: 'Reportado por el estudiante desde la app'
+      accion: esHurtado ? 'cancelar' : 'reportar',
+      motivo: esHurtado ? 'Cancelado por el estudiante desde la app' : 'Reportado por el estudiante desde la app'
     });
     await pedir('/dispositivo/reportar-hurto', {
       method: 'POST',
       body: cuerpo
     });
 
+    equipo.reportadoHurto = !esHurtado;
+    guardarPerfilLocal();
+    pintarEquipos(estado.equipos);
+
     origenHojaEquipo = null;
     cerrarHojaEquipo();
-    mostrarAvisoFlotante('Alerta de hurto emitida a portería');
+    mostrarAvisoFlotante(esHurtado ? 'Reporte de hurto cancelado' : 'Alerta de hurto emitida a portería');
   } catch (error) {
     mostrarError('#error-hoja-equipo', error.message);
   } finally {
     boton.disabled = false;
-    boton.textContent = 'Sí, reportar hurto';
+    boton.textContent = esHurtado ? 'Sí, cancelar reporte' : 'Sí, reportar hurto';
   }
 }
 

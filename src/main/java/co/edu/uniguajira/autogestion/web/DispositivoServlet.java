@@ -36,6 +36,17 @@ public class DispositivoServlet extends HttpServlet {
         String alias = request.getParameter("alias");
         String numeroSerie = request.getParameter("numero_serie") != null ? 
                 request.getParameter("numero_serie") : request.getParameter("numeroSerie");
+        String descripcion = request.getParameter("descripcion");
+
+        if (numeroSerie == null || numeroSerie.isBlank()) {
+            numeroSerie = "Desconocido";
+        }
+
+        if (descripcion != null && !descripcion.isBlank()) {
+            if (alias == null || alias.isBlank()) {
+                alias = descripcion.length() > 40 ? descripcion.substring(0, 40) : descripcion;
+            }
+        }
 
         int idEstudiante = 0;
         int idMarca = 0;

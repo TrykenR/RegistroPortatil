@@ -17,13 +17,14 @@ public class IntentoLoginDAO {
 
     public void registrar(String usuarioIntentado, String direccionIp, boolean exitoso)
             throws SQLException {
-        String sql = "INSERT INTO Intentos_Login_Admin (usuario_intentado, direccion_ip, exitoso) " +
-                     "VALUES (?,?,?)";
+        String sql = "INSERT INTO Intentos_Login_Admin (usuario_intentado, direccion_ip, exitoso, fecha_hora) " +
+                     "VALUES (?, ?, ?, ?)";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setString(1, usuarioIntentado);
             ps.setString(2, direccionIp);
             ps.setBoolean(3, exitoso);
+            ps.setTimestamp(4, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota"))));
             ps.executeUpdate();
         }
     }

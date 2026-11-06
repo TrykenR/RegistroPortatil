@@ -25,6 +25,7 @@ public class ReportarHurtoServlet extends HttpServlet {
 
         String idDispositivoParam = request.getParameter("idDispositivo") != null ? 
                 request.getParameter("idDispositivo") : request.getParameter("id_dispositivo");
+        String accion = request.getParameter("accion");
         String motivo = request.getParameter("motivo");
 
         if (idDispositivoParam == null) {
@@ -35,6 +36,19 @@ public class ReportarHurtoServlet extends HttpServlet {
 
         try {
             int idDispositivo = Integer.parseInt(idDispositivoParam.trim());
+
+            if ("cancelar".equalsIgnoreCase(accion) || "levantar".equalsIgnoreCase(accion)) {
+                boolean cancelado = dispositivoDAO.levantarReporteHurto(idDispositivo);
+                if (cancelado) {
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    out.print("{\"exito\":true,\"mensaje\":\"Reporte de hurto cancelado\"}");
+                } else {
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    out.print("{\"exito\":false,\"error\":\"No se pudo cancelar el reporte\"}");
+                }
+                return;
+            }
+
             boolean registrado = dispositivoDAO.registrarAlertaSeguridad(idDispositivo, "HURTO", 
                     motivo != null ? motivo.trim() : "Reporte de hurto activado por estudiante");
 

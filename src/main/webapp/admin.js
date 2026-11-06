@@ -37,6 +37,11 @@ const AVISO_ANTES_MS     =  5 * 60 * 1000;
 let tiempoRestanteMs      = DURACION_SESION_MS;
 let intervaloTemporizador = null;
 
+// ── Monitoreo en tiempo real de nuevos registros (polling liviano cada 15s) ──
+let ultimoIdVisto = 0;
+let contadorNovedades = 0;
+let intervaloMonitoreo = null;
+
 // Mismo motivo que en app.js: el plan gratuito de Ngrok intercepta la
 // primera visita de cada navegador con una página de aviso en HTML.
 // Sin este encabezado, cualquiera de estos fetch() podría recibir esa
@@ -95,6 +100,13 @@ async function iniciar() {
     $('#boton-vista-estudiante')?.addEventListener('click', irAVistaEstudiante);
     $('#boton-extender-sesion')?.addEventListener('click', extenderSesion);
     $('#boton-cerrar-banner-sesion')?.addEventListener('click', cerrarSesion);
+    $('#btn-recarga-automatica')?.addEventListener('click', () => {
+        resetearNovedades();
+        buscar();
+        cargarResumen();
+        cargarAlertas();
+        cargarIntentos();
+    });
 
     $('#formulario-filtros').addEventListener('submit', (e) => {
         e.preventDefault();
@@ -212,6 +224,8 @@ async function irAVistaEstudiante() {
 /** Oculta el panel, borra de la pantalla los datos que mostraba y muestra el login. */
 function volverAlLogin(mensaje) {
     detenerTemporizador();
+    detenerMonitoreoTiempoReal();
+    resetearNovedades();
     // Restaura la restricción de scroll que tenía styles.css originalmente
     document.documentElement.style.overflow = '';
     document.documentElement.style.height = '';
@@ -326,6 +340,8 @@ async function mostrarPanel() {
     } catch (e) {
         console.warn('Error al cargar intentos:', e);
     }
+
+    iniciarMonitoreoTiempoReal();
 }
 
 /* ---------------------------------------------------------------
@@ -408,6 +424,65 @@ async function extenderSesion() {
 }
 
 /* ---------------------------------------------------------------
+   MONITOREO EN TIEMPO REAL (POLLING LIVIANO CADA 15s)
+   --------------------------------------------------------------- */
+function iniciarMonitoreoTiempoReal() {
+    detenerMonitoreoTiempoReal();
+    intervaloMonitoreo = setInterval(verificarNovedadesTiempoReal, 15000);
+}
+
+function detenerMonitoreoTiempoReal() {
+    if (intervaloMonitoreo) {
+        clearInterval(intervaloMonitoreo);
+        intervaloMonitoreo = null;
+    }
+}
+
+async function verificarNovedadesTiempoReal() {
+    if ($('#vista-panel').hidden) return;
+    try {
+        const res = await fetch('api/admin/historial?pagina=1', conCabecerasNgrok());
+        if (!res.ok) return;
+        const datos = await res.json();
+        if (!datos.ok || !datos.registros || !datos.registros.length) return;
+
+        const maxIdServidor = Number(datos.registros[0].id) || 0;
+        if (ultimoIdVisto > 0 && maxIdServidor > ultimoIdVisto) {
+            // Contar cuántos son nuevos
+            const nuevos = datos.registros.filter((r) => Number(r.id) > ultimoIdVisto).length;
+            contadorNovedades += nuevos;
+            ultimoIdVisto = maxIdServidor;
+            actualizarBadgeNovedades();
+        } else if (ultimoIdVisto === 0) {
+            ultimoIdVisto = maxIdServidor;
+        }
+    } catch (e) {
+        // Ignorar fallas temporales de red en el polling
+    }
+}
+
+function actualizarBadgeNovedades() {
+    const btn = $('#btn-recarga-automatica');
+    const badge = $('#badge-novedades');
+    if (!btn || !badge) return;
+
+    if (contadorNovedades > 0) {
+        btn.classList.add('tiene-novedades');
+        badge.hidden = false;
+        badge.textContent = contadorNovedades > 99 ? '99+' : String(contadorNovedades);
+    } else {
+        btn.classList.remove('tiene-novedades');
+        badge.hidden = true;
+        badge.textContent = '0';
+    }
+}
+
+function resetearNovedades() {
+    contadorNovedades = 0;
+    actualizarBadgeNovedades();
+}
+
+/* ---------------------------------------------------------------
    Catálogos para los selectores de Marca y Color
    Reutiliza el mismo endpoint público que usa la app del estudiante
    (/api/catalogos no requiere sesión — solo lista marcas y colores,
@@ -470,6 +545,14 @@ async function buscar() {
         actualizarBotonLimpiar();
         // Si el servidor no tiene /api/admin/resumen, las tarjetas se calculan con esta página
         if (!resumenDisponible) actualizarKpiStats(datos.registros);
+
+        // Actualizar último ID visto en la primera página
+        if (paginaActual === 1 && datos.registros && datos.registros.length > 0) {
+            const idPrimero = Number(datos.registros[0].id) || 0;
+            if (idPrimero > ultimoIdVisto) {
+                ultimoIdVisto = idPrimero;
+            }
+        }
 
         // Renueva el reloj al interactuar con éxito
         tiempoRestanteMs = DURACION_SESION_MS;
@@ -886,8 +969,40 @@ function pintarAlertas(alertas) {
             barraAcciones.className = 'alerta-acciones-portero';
             barraAcciones.style.marginTop = '8px';
             barraAcciones.style.display = 'flex';
+            barraAcciones.style.flexWrap = 'wrap';
             barraAcciones.style.gap = '8px';
 
+            // 1. Botón para levantar/cancelar alerta de hurto (equipo recuperado)
+            if (alerta.tipoAlerta === 'HURTO') {
+                const btnLevantar = document.createElement('button');
+                btnLevantar.type = 'button';
+                btnLevantar.className = 'btn-mini-alerta';
+                btnLevantar.style.borderColor = 'var(--teal-soft)';
+                btnLevantar.style.color = 'var(--teal-dark)';
+                btnLevantar.textContent = 'Levantar alerta (Recuperado)';
+                btnLevantar.onclick = async () => {
+                    if (confirm(`¿Levantar la alerta de hurto del equipo ${alerta.marca} (${alerta.estudiante})? El equipo volverá a estar habilitado.`)) {
+                        btnLevantar.disabled = true;
+                        try {
+                            const res = await fetch('api/admin/alertas', conCabecerasNgrok({
+                                method: 'POST',
+                                body: new URLSearchParams({ accion: 'levantar_hurto', idDispositivo: alerta.idDispositivo })
+                            }));
+                            const dat = await res.json();
+                            alert(dat.mensaje || 'Alerta levantada exitosamente');
+                            cargarAlertas();
+                            cargarResumen();
+                        } catch (e) {
+                            alert('Error: ' + e.message);
+                        } finally {
+                            btnLevantar.disabled = false;
+                        }
+                    }
+                };
+                barraAcciones.appendChild(btnLevantar);
+            }
+
+            // 2. Botón para desactivar equipo del sistema
             const btnDesactivar = document.createElement('button');
             btnDesactivar.type = 'button';
             btnDesactivar.className = 'btn-mini-alerta';
@@ -903,6 +1018,7 @@ function pintarAlertas(alertas) {
                         const dat = await res.json();
                         alert(dat.mensaje || 'Equipo desactivado');
                         cargarAlertas();
+                        cargarResumen();
                     } catch (e) {
                         alert('Error al desactivar: ' + e.message);
                     } finally {
@@ -910,8 +1026,8 @@ function pintarAlertas(alertas) {
                     }
                 }
             };
-
             barraAcciones.appendChild(btnDesactivar);
+
             cuerpo.appendChild(barraAcciones);
         }
 

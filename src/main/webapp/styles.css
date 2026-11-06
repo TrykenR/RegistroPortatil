@@ -1732,6 +1732,20 @@ a:focus-visible {
   background-color: var(--oro-soft);
   color: var(--oro-dark);
 }
+.laptop-estado-hurto {
+  background-color: rgba(220, 38, 38, 0.16);
+  color: #DC2626;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  font-weight: 800;
+}
+.laptop-item-hurto {
+  border-color: rgba(220, 38, 38, 0.45) !important;
+}
+.laptop-btn-hurto {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.08) 0%, transparent 100%) !important;
+  border: 1.5px solid rgba(220, 38, 38, 0.5) !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.12) !important;
+}
 
 .laptop-more-btn {
   position: absolute;

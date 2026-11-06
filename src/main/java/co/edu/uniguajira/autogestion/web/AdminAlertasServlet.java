@@ -109,7 +109,18 @@ public class AdminAlertasServlet extends HttpServlet {
                     salida.print("{\"ok\":true,\"mensaje\":\"Equipo desactivado del sistema.\"}");
                 } else {
                     respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    salida.print(JsonUtil.error("No se pudo desactivar el equipo."));
+                    salida.print(JsonUtil.error("No se pudo desactivar el equipo (puede que ya esté inactivo)."));
+                }
+                return;
+            }
+
+            if ("levantar_hurto".equalsIgnoreCase(accion) || "cancelar_hurto".equalsIgnoreCase(accion)) {
+                boolean exito = dao.levantarReporteHurto(idDispositivo);
+                if (exito) {
+                    salida.print("{\"ok\":true,\"mensaje\":\"Reporte de hurto cancelado. El equipo vuelve a estar habilitado.\"}");
+                } else {
+                    respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    salida.print(JsonUtil.error("No se pudo levantar el reporte de hurto."));
                 }
                 return;
             }

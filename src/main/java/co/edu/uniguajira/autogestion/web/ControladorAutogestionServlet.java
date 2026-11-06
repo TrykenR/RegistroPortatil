@@ -56,11 +56,13 @@ public class ControladorAutogestionServlet extends HttpServlet {
                     String proximoMov = (ultimoMov == HistorialAccesoDAO.ENTRADA) ? "SALIDA" : "ENTRADA";
 
                     dispJson.append(String.format(
-                        "{\"id\":%d,\"id_dispositivo\":%d,\"marca\":\"%s\",\"color\":\"%s\",\"alias\":\"%s\",\"ultimoMovimiento\":%d,\"siguienteMovimiento\":\"%s\"}",
+                        "{\"id\":%d,\"id_dispositivo\":%d,\"marca\":\"%s\",\"color\":\"%s\",\"alias\":\"%s\",\"numeroSerie\":\"%s\",\"reportadoHurto\":%b,\"ultimoMovimiento\":%d,\"siguienteMovimiento\":\"%s\"}",
                         d.getIdDispositivo(), d.getIdDispositivo(),
                         d.getMarca() != null ? d.getMarca() : "",
                         d.getColor() != null ? d.getColor() : "",
                         d.getAlias() != null ? d.getAlias().replace("\"", "'") : "",
+                        d.getNumeroSerie() != null ? d.getNumeroSerie().replace("\"", "'") : "",
+                        d.isReportadoHurto(),
                         ultimoMov,
                         proximoMov
                     ));

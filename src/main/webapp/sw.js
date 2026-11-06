@@ -26,7 +26,7 @@
 'use strict';
 
 // Subir este número obliga a refrescar la caché en todos los celulares.
-const VERSION_CACHE = 'autogestion-v16';
+const VERSION_CACHE = 'autogestion-v17';
 
 const ARCHIVOS_DEL_SHELL = [
     './',
@@ -198,75 +198,83 @@ self.addEventListener('message', (evento) => {
  *   pendiente: reintentarlo para siempre solo llenaría la cola.
  */
 const MAX_REINTENTOS_OFFLINE = 3;
+let syncEnProgreso = false;
 
 /**
  * Recorre la cola de IndexedDB y envía cada registro al backend.
  *
  * Reglas que sigue:
+ * - Mutex syncEnProgreso: previene carreras si el evento 'sync' y 'message' se disparan juntos.
  * - Borra el pendiente si el servidor confirma o si es un registro duplicado ya registrado.
  * - Un 403, 400 o 404 (datos inexistentes/inválidos) o superar MAX_REINTENTOS_OFFLINE 
  *   sí borra el pendiente para evitar atascos permanentes en el dispositivo.
  */
 async function sincronizarPendientes() {
-    const pendientes = await self.BDOffline.listarPendientes();
-    if (!pendientes.length) return;
+    if (syncEnProgreso) return;
+    syncEnProgreso = true;
+    try {
+        const pendientes = await self.BDOffline.listarPendientes();
+        if (!pendientes.length) return;
 
-    let sincronizados = 0;
-    let modificados = false;
+        let sincronizados = 0;
+        let modificados = false;
 
-    for (const registro of pendientes) {
-        try {
-            const cuerpo = new URLSearchParams({
-                idEstudiante:       registro.idEstudiante,
-                idDispositivo:      registro.idDispositivo,
-                fechaEventoCliente: registro.fechaEvento,
-                idOrigen:           '2'
-            });
+        for (const registro of pendientes) {
+            try {
+                const cuerpo = new URLSearchParams({
+                    idEstudiante:       registro.idEstudiante,
+                    idDispositivo:      registro.idDispositivo,
+                    fechaEventoCliente: registro.fechaEvento,
+                    idOrigen:           '2'
+                });
 
-            const respuesta = await fetch('./api/accesos', {
-                method: 'POST',
-                body: cuerpo,
-                headers: { 'ngrok-skip-browser-warning': 'true' }
-            });
+                const respuesta = await fetch('./api/accesos', {
+                    method: 'POST',
+                    body: cuerpo,
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
 
-            if (respuesta.ok) {
-                const datos = await respuesta.json();
-                if (datos.ok || datos.movimiento) {
+                if (respuesta.ok) {
+                    const datos = await respuesta.json();
+                    if (datos.ok || datos.movimiento) {
+                        await self.BDOffline.eliminarPendiente(registro.idLocal);
+                        sincronizados++;
+                        modificados = true;
+                        continue;
+                    }
+                }
+
+                // Error de cliente permanente (400, 403, 404, etc.)
+                if (respuesta.status >= 400 && respuesta.status < 500) {
                     await self.BDOffline.eliminarPendiente(registro.idLocal);
-                    sincronizados++;
                     modificados = true;
                     continue;
                 }
-            }
 
-            // Error de cliente permanente (400, 403, 404, etc.)
-            if (respuesta.status >= 400 && respuesta.status < 500) {
-                await self.BDOffline.eliminarPendiente(registro.idLocal);
-                modificados = true;
-                continue;
-            }
+                // Descartar tras superar límite de reintentos
+                if ((registro.intentos || 0) >= MAX_REINTENTOS_OFFLINE) {
+                    await self.BDOffline.eliminarPendiente(registro.idLocal);
+                    modificados = true;
+                    continue;
+                }
 
-            // Descartar tras superar límite de reintentos
-            if ((registro.intentos || 0) >= MAX_REINTENTOS_OFFLINE) {
-                await self.BDOffline.eliminarPendiente(registro.idLocal);
-                modificados = true;
-                continue;
-            }
-
-            await self.BDOffline.marcarIntentoFallido(registro);
-
-        } catch (error) {
-            if ((registro.intentos || 0) >= MAX_REINTENTOS_OFFLINE) {
-                await self.BDOffline.eliminarPendiente(registro.idLocal);
-                modificados = true;
-            } else {
                 await self.BDOffline.marcarIntentoFallido(registro);
+
+            } catch (error) {
+                if ((registro.intentos || 0) >= MAX_REINTENTOS_OFFLINE) {
+                    await self.BDOffline.eliminarPendiente(registro.idLocal);
+                    modificados = true;
+                } else {
+                    await self.BDOffline.marcarIntentoFallido(registro);
+                }
             }
         }
-    }
 
-    if (modificados) {
-        await avisarAlaApp(sincronizados);
+        if (modificados) {
+            await avisarAlaApp(sincronizados);
+        }
+    } finally {
+        syncEnProgreso = false;
     }
 }
 

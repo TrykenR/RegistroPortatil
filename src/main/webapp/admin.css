@@ -271,6 +271,53 @@ body.cuerpo-admin {
   background-color: #4ADE80;
 }
 
+.btn-recarga-admin {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.btn-recarga-admin:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+.btn-recarga-admin.tiene-novedades {
+  background: linear-gradient(135deg, rgba(204, 92, 80, 0.35) 0%, rgba(204, 92, 80, 0.15) 100%);
+  border-color: #CC5C50;
+  box-shadow: 0 0 14px rgba(204, 92, 80, 0.5);
+  animation: pulsoNovedades 2s infinite ease-in-out;
+}
+@keyframes pulsoNovedades {
+  0%, 100% { box-shadow: 0 0 8px rgba(204, 92, 80, 0.4); }
+  50% { box-shadow: 0 0 18px rgba(204, 92, 80, 0.85); }
+}
+.badge-novedades {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  border-radius: 999px;
+  background-color: #CC5C50;
+  color: #FFFFFF;
+  border: 1.5px solid #1F1713;
+  margin-left: 2px;
+}
+
 .btn-header-link {
   border-radius: 999px;
   padding: 6px 14px;

@@ -100,6 +100,15 @@ public class RegistroAccesoServlet extends HttpServlet {
             HistorialAccesoDAO.ResultadoSiguienteMovimiento sig = 
                     historialAccesoDAO.calcularSiguienteMovimiento(idDispositivo, fechaEvento);
 
+            // Si es sincronización offline, evitar insertar duplicados exactos si ya llegó la misma marca
+            if (esSincronizacionOffline && historialAccesoDAO.existeEventoIdentico(idDispositivo, sig.movimiento, fechaEvento)) {
+                response.setStatus(HttpServletResponse.SC_OK);
+                String tipoTexto = (sig.movimiento == HistorialAccesoDAO.ENTRADA) ? "ENTRADA" : "SALIDA";
+                out.printf("{\"ok\":true,\"movimiento\":\"%s\",\"marca\":\"%s\",\"color\":\"%s\",\"hora\":\"%s\",\"mensaje\":\"Sincronización duplicada omitida\"}",
+                        tipoTexto, dispositivo.getMarca(), dispositivo.getColor(), formatHoraActual());
+                return;
+            }
+
             if (!sig.permitido && !esSincronizacionOffline) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.print("{\"ok\":false,\"mensaje\":\"Debes esperar un momento antes de registrar otro movimiento.\"}");

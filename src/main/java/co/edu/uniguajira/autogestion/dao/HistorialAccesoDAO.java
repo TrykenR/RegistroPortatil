@@ -64,7 +64,7 @@ public class HistorialAccesoDAO {
         String sql =
             "INSERT INTO Historial_Accesos " +
             "(id_dispositivo, id_tipo_movimiento, id_origen, fecha_hora_evento, fecha_hora_sincronizado) " +
-            "VALUES (?,?,?,?,NOW())";
+            "VALUES (?,?,?,?,?)";
 
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql,
@@ -74,6 +74,7 @@ public class HistorialAccesoDAO {
             ps.setInt(2, registro.getIdTipoMovimiento());
             ps.setInt(3, registro.getIdOrigen());
             ps.setTimestamp(4, Timestamp.valueOf(registro.getFechaHoraEvento()));
+            ps.setTimestamp(5, Timestamp.valueOf(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota"))));
             ps.executeUpdate();
 
             try (ResultSet claves = ps.getGeneratedKeys()) {
@@ -174,6 +175,25 @@ public class HistorialAccesoDAO {
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    /**
+     * Valida si ya existe exactamente este mismo evento para el dispositivo (mismo movimiento y fecha evento).
+     * Evita duplicados durante sincronizaciones offline concurrentes o reintentos del Service Worker.
+     */
+    public boolean existeEventoIdentico(int idDispositivo, int idTipoMovimiento, java.time.LocalDateTime fechaEvento) throws SQLException {
+        if (fechaEvento == null) return false;
+        String sql = "SELECT 1 FROM Historial_Accesos " +
+                     " WHERE id_dispositivo = ? AND id_tipo_movimiento = ? AND fecha_hora_evento = ? LIMIT 1";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idDispositivo);
+            ps.setInt(2, idTipoMovimiento);
+            ps.setTimestamp(3, Timestamp.valueOf(fechaEvento));
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
