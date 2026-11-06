@@ -38,7 +38,7 @@ public class AdminResumenServlet extends HttpServlet {
         respuesta.setContentType("application/json;charset=UTF-8");
         PrintWriter salida = respuesta.getWriter();
 
-        LocalDate fecha = LocalDate.now();
+        LocalDate fecha = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
         String fechaParam = peticion.getParameter("fecha");
         if (fechaParam != null && !fechaParam.isBlank()) {
             try {

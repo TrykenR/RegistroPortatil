@@ -26,7 +26,7 @@
 'use strict';
 
 // Subir este número obliga a refrescar la caché en todos los celulares.
-const VERSION_CACHE = 'autogestion-v13';
+const VERSION_CACHE = 'autogestion-v15';
 
 const ARCHIVOS_DEL_SHELL = [
     './',

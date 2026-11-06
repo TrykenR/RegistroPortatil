@@ -1228,7 +1228,7 @@ async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
   }
 
   const horaActual = new Date();
-  const fechaEvento = horaActual.toISOString().slice(0, 19);
+  const fechaEvento = fechaHoraLocalIso(horaActual);
 
   try {
     const params = {
@@ -1340,6 +1340,16 @@ async function encolarYConfirmar(equipo, fechaEvento) {
     alert('No pudimos guardar el registro en este celular. Pasa con el portero.');
     document.querySelectorAll('.laptop-item-btn').forEach((b) => (b.disabled = false));
   }
+}
+
+function fechaHoraLocalIso(d = new Date()) {
+  const anio = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  const hora = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  const seg = String(d.getSeconds()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}T${hora}:${min}:${seg}`;
 }
 
 function formatHora(d) {
@@ -1458,19 +1468,21 @@ function abrirHojaEquipo(equipo, origen) {
 
   $('#hoja-equipo-acciones').hidden = false;
   $('#hoja-equipo-confirmar').hidden = true;
+  $('#hoja-equipo-confirmar-hurto').hidden = true;
   $('#boton-cerrar-hoja').textContent = 'Cancelar';
   mostrarError('#error-hoja-equipo', '');
 
   // Editar o eliminar exige conexión y, si el estudiante tiene PIN, haberlo verificado.
   let aviso = '';
   if (!navigator.onLine) {
-    aviso = 'Necesitas conexión para editar o eliminar tus equipos.';
+    aviso = 'Necesitas conexión para gestionar o reportar tus equipos.';
   } else if (estado.tienePin && !estado.pinSesion) {
-    aviso = 'Vuelve a identificarte con tu PIN para editar o eliminar tus equipos.';
+    aviso = 'Vuelve a identificarte con tu PIN para gestionar o reportar tus equipos.';
   }
   $('#hoja-equipo-aviso').textContent = aviso;
   $('#hoja-equipo-aviso').hidden = !aviso;
   $('#boton-editar-equipo').disabled = Boolean(aviso);
+  $('#boton-reportar-hurto').disabled = Boolean(aviso);
   $('#boton-eliminar-equipo').disabled = Boolean(aviso);
 
   $('#hoja-equipo').hidden = false;
@@ -1489,6 +1501,43 @@ function pedirConfirmacionEliminar() {
   $('#hoja-equipo-confirmar').hidden = false;
   $('#boton-cerrar-hoja').textContent = 'No, conservarlo';
   $('#boton-confirmar-eliminar').focus();
+}
+
+function pedirConfirmacionHurto() {
+  $('#hoja-equipo-acciones').hidden = true;
+  $('#hoja-equipo-confirmar-hurto').hidden = false;
+  $('#hoja-equipo-confirmar').hidden = true;
+  $('#boton-cerrar-hoja').textContent = 'Cancelar';
+  $('#boton-confirmar-hurto').focus();
+}
+
+async function reportarHurtoSeleccionado() {
+  const equipo = estado.equipoAcciones;
+  if (!equipo) return;
+  const boton = $('#boton-confirmar-hurto');
+  boton.disabled = true;
+  boton.textContent = 'Reportando…';
+  mostrarError('#error-hoja-equipo', '');
+
+  try {
+    const cuerpo = new URLSearchParams({
+      idDispositivo: equipo.id,
+      motivo: 'Reportado por el estudiante desde la app'
+    });
+    await pedir('/dispositivo/reportar-hurto', {
+      method: 'POST',
+      body: cuerpo
+    });
+
+    origenHojaEquipo = null;
+    cerrarHojaEquipo();
+    mostrarAvisoFlotante('Alerta de hurto emitida a portería');
+  } catch (error) {
+    mostrarError('#error-hoja-equipo', error.message);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Sí, reportar hurto';
+  }
 }
 
 async function eliminarEquipoSeleccionado() {
@@ -1667,6 +1716,8 @@ function iniciar() {
 
   // Hoja de acciones de equipo
   $('#boton-editar-equipo')?.addEventListener('click', editarEquipoSeleccionado);
+  $('#boton-reportar-hurto')?.addEventListener('click', pedirConfirmacionHurto);
+  $('#boton-confirmar-hurto')?.addEventListener('click', reportarHurtoSeleccionado);
   $('#boton-eliminar-equipo')?.addEventListener('click', pedirConfirmacionEliminar);
   $('#boton-confirmar-eliminar')?.addEventListener('click', eliminarEquipoSeleccionado);
   $('#boton-cerrar-hoja')?.addEventListener('click', cerrarHojaEquipo);

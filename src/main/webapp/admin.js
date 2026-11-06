@@ -880,6 +880,41 @@ function pintarAlertas(alertas) {
             cuerpo.appendChild(descripcion);
         }
 
+        // Acciones de administración / portería sobre la alerta
+        if (alerta.idDispositivo) {
+            const barraAcciones = document.createElement('div');
+            barraAcciones.className = 'alerta-acciones-portero';
+            barraAcciones.style.marginTop = '8px';
+            barraAcciones.style.display = 'flex';
+            barraAcciones.style.gap = '8px';
+
+            const btnDesactivar = document.createElement('button');
+            btnDesactivar.type = 'button';
+            btnDesactivar.className = 'btn-mini-alerta';
+            btnDesactivar.textContent = 'Desactivar equipo';
+            btnDesactivar.onclick = async () => {
+                if (confirm(`¿Desactivar el equipo ${alerta.marca} (${alerta.estudiante}) del sistema? Ya no podrá registrar más accesos.`)) {
+                    btnDesactivar.disabled = true;
+                    try {
+                        const res = await fetch('api/admin/alertas', conCabecerasNgrok({
+                            method: 'POST',
+                            body: new URLSearchParams({ accion: 'desactivar_equipo', idDispositivo: alerta.idDispositivo })
+                        }));
+                        const dat = await res.json();
+                        alert(dat.mensaje || 'Equipo desactivado');
+                        cargarAlertas();
+                    } catch (e) {
+                        alert('Error al desactivar: ' + e.message);
+                    } finally {
+                        btnDesactivar.disabled = false;
+                    }
+                }
+            };
+
+            barraAcciones.appendChild(btnDesactivar);
+            cuerpo.appendChild(barraAcciones);
+        }
+
         item.append(icono, cuerpo);
         lista.appendChild(item);
     });

@@ -1193,3 +1193,19 @@ details[open] .chevron-arrow {
 @media (max-width: 520px) {
   .alerta { padding: 12px 16px; }
 }
+
+.btn-mini-alerta {
+  background: var(--cont);
+  color: var(--tinta);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-mini-alerta:hover {
+  background: var(--papel);
+  border-color: var(--borde-fuerte);
+}

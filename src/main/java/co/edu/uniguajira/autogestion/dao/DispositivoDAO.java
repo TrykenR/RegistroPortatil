@@ -108,16 +108,32 @@ public class DispositivoDAO {
     }
 
     /**
-     * Registra una alerta de seguridad (por ejemplo: HURTO o DISCREPANCIA_SALIDA).
+     * Registra una alerta de seguridad (por ejemplo: HURTO o DISCREPANCIA_SALIDA)
+     * y, si es HURTO, marca directamente el equipo como reportado_hurto = TRUE.
      */
     public boolean registrarAlertaSeguridad(int idDispositivo, String tipoAlerta, String descripcion) throws SQLException {
-        String sql = "INSERT INTO Alertas_Seguridad (id_dispositivo, tipo_alerta, descripcion) VALUES (?, ?, ?)";
-        try (Connection cn = ConexionBD.obtenerConexion();
-             PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setInt(1, idDispositivo);
-            ps.setString(2, tipoAlerta);
-            ps.setString(3, descripcion);
-            return ps.executeUpdate() > 0;
+        String sqlAlerta = "INSERT INTO Alertas_Seguridad (id_dispositivo, tipo_alerta, descripcion) VALUES (?, ?, ?)";
+        String sqlHurto = "UPDATE Dispositivos_Estudiante SET reportado_hurto = TRUE, fecha_reporte_hurto = NOW(), motivo_reporte = ? WHERE id_dispositivo = ?";
+        
+        try (Connection cn = ConexionBD.obtenerConexion()) {
+            cn.setAutoCommit(false);
+            try (PreparedStatement ps = cn.prepareStatement(sqlAlerta)) {
+                ps.setInt(1, idDispositivo);
+                ps.setString(2, tipoAlerta);
+                ps.setString(3, descripcion);
+                ps.executeUpdate();
+            }
+            if ("HURTO".equalsIgnoreCase(tipoAlerta)) {
+                try (PreparedStatement ps2 = cn.prepareStatement(sqlHurto)) {
+                    ps2.setString(1, descripcion);
+                    ps2.setInt(2, idDispositivo);
+                    ps2.executeUpdate();
+                }
+            }
+            cn.commit();
+            return true;
+        } catch (SQLException e) {
+            throw e;
         }
     }
 

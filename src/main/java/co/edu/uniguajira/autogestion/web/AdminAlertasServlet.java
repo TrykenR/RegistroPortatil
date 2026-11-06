@@ -45,6 +45,7 @@ public class AdminAlertasServlet extends HttpServlet {
             while (rs.next()) {
                 filas.add("{"
                     + JsonUtil.campo("idAlerta", rs.getLong("id_alerta")) + ","
+                    + JsonUtil.campo("idDispositivo", rs.getInt("id_dispositivo")) + ","
                     + JsonUtil.campo("tipoAlerta", rs.getString("tipo_alerta")) + ","
                     + JsonUtil.campo("descripcion", rs.getString("descripcion")) + ","
                     + JsonUtil.campo("fecha", String.valueOf(rs.getTimestamp("fecha_hora"))) + ","
@@ -63,6 +64,63 @@ public class AdminAlertasServlet extends HttpServlet {
             getServletContext().log("Error consultando alertas de seguridad", e);
             respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             salida.print(JsonUtil.error("No se pudieron consultar las alertas de seguridad."));
+        }
+    }
+
+    /**
+     * POST /api/admin/alertas
+     * Parámetros: accion ("reportar_hurto" | "desactivar_equipo"), idDispositivo, motivo
+     */
+    @Override
+    protected void doPost(HttpServletRequest peticion, HttpServletResponse respuesta)
+            throws IOException {
+        respuesta.setContentType("application/json;charset=UTF-8");
+        PrintWriter salida = respuesta.getWriter();
+
+        String accion = peticion.getParameter("accion");
+        String idDispStr = peticion.getParameter("idDispositivo");
+        String motivo = peticion.getParameter("motivo");
+
+        if (idDispStr == null || !idDispStr.matches("\\d+")) {
+            respuesta.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            salida.print(JsonUtil.error("idDispositivo inválido"));
+            return;
+        }
+
+        int idDispositivo = Integer.parseInt(idDispStr);
+        co.edu.uniguajira.autogestion.dao.DispositivoDAO dao = new co.edu.uniguajira.autogestion.dao.DispositivoDAO();
+
+        try {
+            if ("reportar_hurto".equalsIgnoreCase(accion)) {
+                boolean exito = dao.registrarAlertaSeguridad(idDispositivo, "HURTO",
+                        motivo != null && !motivo.isBlank() ? motivo.trim() : "Reporte de hurto generado por administración / portería");
+                if (exito) {
+                    salida.print("{\"ok\":true,\"mensaje\":\"Equipo reportado como hurtado exitosamente.\"}");
+                } else {
+                    respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    salida.print(JsonUtil.error("No se pudo registrar el reporte de hurto."));
+                }
+                return;
+            }
+
+            if ("desactivar_equipo".equalsIgnoreCase(accion)) {
+                boolean exito = dao.desactivar(idDispositivo);
+                if (exito) {
+                    salida.print("{\"ok\":true,\"mensaje\":\"Equipo desactivado del sistema.\"}");
+                } else {
+                    respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    salida.print(JsonUtil.error("No se pudo desactivar el equipo."));
+                }
+                return;
+            }
+
+            respuesta.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            salida.print(JsonUtil.error("Acción inválida."));
+
+        } catch (SQLException e) {
+            getServletContext().log("Error en acción de alerta/seguridad", e);
+            respuesta.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            salida.print(JsonUtil.error("Error SQL al procesar: " + e.getMessage()));
         }
     }
 }

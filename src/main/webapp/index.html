@@ -478,6 +478,15 @@
             <span>Marca, color o apodo</span>
           </span>
         </button>
+        <button id="boton-reportar-hurto" type="button" class="hoja-accion hoja-accion-peligro">
+          <span class="hoja-accion-icono" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <span class="hoja-accion-textos">
+            <strong>Reportar como hurtado / extraviado</strong>
+            <span>Genera alerta inmediata en portería</span>
+          </span>
+        </button>
         <button id="boton-eliminar-equipo" type="button" class="hoja-accion hoja-accion-peligro">
           <span class="hoja-accion-icono" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>
@@ -487,6 +496,12 @@
             <span>Deja de aparecer en tu lista</span>
           </span>
         </button>
+      </div>
+
+      <div id="hoja-equipo-confirmar-hurto" class="hoja-confirmar" hidden>
+        <p class="hoja-confirmar-titulo">¿Reportar como hurtado / extraviado?</p>
+        <p class="hoja-confirmar-texto">Se emitirá una alerta de seguridad inmediata en la portería y el equipo quedará bloqueado para autorizaciones.</p>
+        <button id="boton-confirmar-hurto" type="button" class="btn-peligro">Sí, reportar hurto</button>
       </div>
 
       <div id="hoja-equipo-confirmar" class="hoja-confirmar" hidden>
