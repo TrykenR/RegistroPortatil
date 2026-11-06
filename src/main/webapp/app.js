@@ -1926,32 +1926,14 @@ function iniciarGuiaDeUso() {
   const modal = $('#modal-guia');
   const botonesAbrir = document.querySelectorAll('[data-abrir-guia]');
   const btnCerrar = $('#btn-cerrar-guia');
-  const btnCerrar2 = $('#btn-cerrar-guia-2');
   const btnEntendido = $('#btn-entendido-guia');
-  const btnEntendidoAdmin = $('#btn-entendido-guia-admin');
-
-  const cardEstudiante = $('#guia-card-estudiante');
-  const cardAdmin = $('#guia-card-admin');
-  const btnIrAdmin = $('#btn-guia-ir-admin');
-  const btnVolverEstudiante = $('#btn-guia-volver-estudiante');
 
   if (!botonesAbrir.length || !modal) return;
 
   let botonOrigen = null;
 
-  const mostrarTarjetaAdmin = () => {
-    if (cardEstudiante) cardEstudiante.style.display = 'none';
-    if (cardAdmin) cardAdmin.style.display = 'flex';
-  };
-
-  const mostrarTarjetaEstudiante = () => {
-    if (cardAdmin) cardAdmin.style.display = 'none';
-    if (cardEstudiante) cardEstudiante.style.display = 'flex';
-  };
-
   const abrirModal = (evento) => {
     botonOrigen = evento?.currentTarget || null;
-    mostrarTarjetaEstudiante();
     modal.style.display = 'flex';
     $('#btn-cerrar-guia')?.focus();
   };
@@ -1963,19 +1945,16 @@ function iniciarGuiaDeUso() {
 
   botonesAbrir.forEach((boton) => boton.addEventListener('click', abrirModal));
   btnCerrar?.addEventListener('click', cerrarModal);
-  btnCerrar2?.addEventListener('click', cerrarModal);
   btnEntendido?.addEventListener('click', cerrarModal);
-  btnEntendidoAdmin?.addEventListener('click', cerrarModal);
-
-  btnIrAdmin?.addEventListener('click', mostrarTarjetaAdmin);
-  btnVolverEstudiante?.addEventListener('click', mostrarTarjetaEstudiante);
 
   // Cerrar al tocar fuera de la tarjeta o con la tecla Escape
   modal.addEventListener('click', (e) => {
     if (e.target === modal) cerrarModal();
   });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.style.display === 'flex') cerrarModal();
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') {
+      cerrarModal();
+    }
   });
 }
 

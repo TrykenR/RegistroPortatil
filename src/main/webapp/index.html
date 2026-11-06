@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-<title>Portería · Universidad de La Guajira</title>
+<title>Registro Portatiles · UNIGUAJIRA</title>
 <link rel="icon" type="image/png" href="iconos/icono-192.png?v=2">
 <link rel="preload" href="fuentes/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
@@ -113,10 +113,10 @@
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       </div>
 
-      <p id="subtitulo-pin" class="eyebrow">Seguridad de portería</p>
+      <p id="subtitulo-pin" class="eyebrow">Lo sabemos pero...</p>
       <h1 id="titulo-pin" class="title-big">Ingresa tu PIN</h1>
       <p id="desc-pin" class="sub-desc sub-desc-pin">
-        Digita tus 4 números de seguridad.
+        Digita tu PIN de 4 digitos.
       </p>
 
       <!-- Indicadores de dígitos (4 dots/cajas) -->
@@ -141,7 +141,7 @@
           <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><path d="M12 15v3"/></svg>
         </span>
         <p class="pin-bloqueo-titulo">PIN bloqueado por seguridad</p>
-        <p class="pin-bloqueo-texto">Hubo demasiados intentos fallidos. Espera o pasa con el portero para registrar tu equipo.</p>
+        <p class="pin-bloqueo-texto">Hubo demasiados intentos fallidos. Espera o registrate manualmente en el cuaderno.</p>
         <p class="pin-bloqueo-reloj">
           <span>Podrás intentarlo en</span>
           <strong id="pin-bloqueo-tiempo">15:00</strong>
@@ -203,7 +203,7 @@
 
       <!-- PIN de 4 dígitos para nuevo estudiante -->
       <div class="field-group">
-        <label for="campo-pin-nuevo" class="field-label">Crea tu PIN de seguridad (4 números)</label>
+        <label for="campo-pin-nuevo" class="field-label">Crea tu PIN de seguridad (4 dígitos)</label>
         <span class="campo-con-accion">
           <input id="campo-pin-nuevo" class="field-input field-input-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="new-password">
           <button id="boton-ver-pin" type="button" class="boton-ver-pin" aria-label="Mostrar PIN" aria-pressed="false" aria-controls="campo-pin-nuevo">
@@ -411,13 +411,13 @@
 
       <div id="aviso-offline-equipos" class="aviso-offline" style="display: none;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="icon-fixed" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
-        Tus equipos están guardados en este celular. Puedes registrar igual.
+        Tus equipos se encuentran guardados. Puedes registrar igual.
       </div>
 
       <ul id="lista-equipos" class="laptops-list"></ul>
       <p id="pista-equipos" class="pista-equipos">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-        Mantén pulsado un equipo o toca los tres puntos para editarlo o eliminarlo.
+        Mantén pulsado un equipo o toca los tres puntos para ver las interacciones.
       </p>
     </main>
 
@@ -454,7 +454,7 @@
     <div class="confirm-bottom">
       <p id="confirm-note-offline" class="confirm-offline-note" style="display: none;">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 2 20 20M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.956-.445M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-11.62-4.36"/></svg>
-        Guardado sin conexión · se enviará solo
+        Guardado sin conexión.
       </p>
       <p id="confirm-note-reconfirmed" class="confirm-reconfirmed-note" style="display: none;">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
@@ -469,7 +469,7 @@
           <span id="confirm-autocierre-barra" class="confirm-autocierre-barra"></span>
         </span>
       </button>
-      <p id="confirm-autocierre-texto" class="confirm-autocierre-texto">Se cierra sola en unos segundos.</p>
+      <p id="confirm-autocierre-texto" class="confirm-autocierre-texto">Pulsa o espera el cierre automático.</p>
     </div>
   </section>
 
@@ -567,7 +567,7 @@
         <span class="guia-num">1</span>
         <div>
           <strong>Identificación</strong>
-          <p>Ingresa tu cédula o código estudiantil. Si eres nuevo, el sistema te solicitará tus nombres, PIN y la marca/color de tu equipo.</p>
+          <p>Ingresa tu cédula o código estudiantil. Si eres nuevo, el sistema te solicitará algunos datos de tí y tu portatil.</p>
         </div>
       </div>
 
@@ -575,14 +575,14 @@
         <span class="guia-num">2</span>
         <div>
           <strong>Seguridad con PIN</strong>
-          <p>Digita tus 4 números de PIN para verificar tu identidad y desbloquear tus portátiles registrados.</p>
+          <p>PIN de 4 dígitos para verificar tu identidad y desbloquear tus portátiles registrados.</p>
         </div>
       </div>
 
       <div class="guia-paso">
         <span class="guia-num">3</span>
         <div>
-          <strong>Entrada o Salida en 1 Toque</strong>
+          <strong>Entrada o Salida en un toque</strong>
           <p>Toca tu portátil en pantalla. El sistema alternará automáticamente entre ENTRADA y SALIDA con confirmación visual inmediata.</p>
         </div>
       </div>
@@ -590,66 +590,14 @@
       <div class="guia-paso">
         <span class="guia-num">4</span>
         <div>
-          <strong>Sin Conexión (Offline)</strong>
-          <p>Si la portería pierde internet, tus registros se guardan en el dispositivo y se sincronizan solos al recuperar señal.</p>
+          <strong>Modo Sin Conexión (Offline)</strong>
+          <p>Si la portería pierde internet, puedes seguir registrando entradas y salidas normalmente siempre que ya te hayas registrado antes en el sistema. Tus movimientos se guardan seguros en el dispositivo y se sincronizan automáticamente con el servidor apenas regrese la conexión.</p>
         </div>
       </div>
     </div>
 
     <footer class="modal-guia-footer">
       <button id="btn-entendido-guia" type="button" class="btn-guia-entendido" style="width: 100%;">Entendido</button>
-    </footer>
-  </div>
-
-  <!-- Tarjeta 2: Explicación de Acceder (Administración / Vigilancia) -->
-  <div id="guia-card-admin" class="modal-guia-card" style="display: none;">
-    <header class="modal-guia-header">
-      <div class="modal-guia-heading">
-        <span class="modal-guia-icon modal-guia-icon-admin">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-        </span>
-        <h2 class="modal-guia-titulo">¿Qué es "Acceder"?</h2>
-      </div>
-      <button id="btn-cerrar-guia-2" type="button" class="btn-guia-cerrar" aria-label="Cerrar guía">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </header>
-
-    <div class="modal-guia-body">
-      <div class="guia-paso">
-        <span class="guia-num guia-num-admin">A</span>
-        <div>
-          <strong>Exclusivo para Personal Autorizado</strong>
-          <p>El enlace inferior <em>Acceder</em> está reservado para vigilantes de portería y administradores de la Universidad de La Guajira.</p>
-        </div>
-      </div>
-
-      <div class="guia-paso">
-        <span class="guia-num guia-num-admin">B</span>
-        <div>
-          <strong>Historial y Filtros en Tiempo Real</strong>
-          <p>Permite auditar entradas y salidas con filtros por fecha, documento, código estudiantil, marca y color de portátil.</p>
-        </div>
-      </div>
-
-      <div class="guia-paso">
-        <span class="guia-num guia-num-admin">C</span>
-        <div>
-          <strong>Alertas y Control de Seguridad</strong>
-          <p>Monitorea equipos reportados por hurto, intentos fallidos de PIN y estado de sincronizaciones offline de cada punto de control.</p>
-        </div>
-      </div>
-    </div>
-
-    <footer class="modal-guia-footer modal-guia-footer-dual">
-      <button id="btn-guia-volver-estudiante" type="button" class="btn-guia-nav btn-guia-nav-prev" aria-label="Volver a Guía del Sistema">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        <span>Volver a Guía</span>
-      </button>
-      <button id="btn-entendido-guia-admin" type="button" class="btn-guia-entendido">Entendido</button>
     </footer>
   </div>
 </div>
