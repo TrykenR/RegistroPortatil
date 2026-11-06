@@ -20,6 +20,8 @@ import java.time.format.DateTimeFormatter;
 @WebServlet({"/api/accesos", "/api/acceso"})
 public class RegistroAccesoServlet extends HttpServlet {
 
+    private static final java.time.ZoneId ZONA_COLOMBIA = java.time.ZoneId.of("America/Bogota");
+
     private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
     private final EstudianteDAO estudianteDAO = new EstudianteDAO();
     private final HistorialAccesoDAO historialAccesoDAO = new HistorialAccesoDAO();
@@ -84,7 +86,7 @@ public class RegistroAccesoServlet extends HttpServlet {
             int idOrigenFinal = esSincronizacionOffline ? HistorialAcceso.ORIGEN_OFFLINE_SINCRONIZADO : HistorialAcceso.ORIGEN_ONLINE;
 
             LocalDateTime fechaEvento = fechaEventoParam != null && !fechaEventoParam.isBlank() ?
-                    LocalDateTime.parse(fechaEventoParam.replace(" ", "T")) : LocalDateTime.now();
+                    LocalDateTime.parse(fechaEventoParam.replace(" ", "T")) : LocalDateTime.now(ZONA_COLOMBIA);
 
             // 5. Antirrebote (solo para eventos en vivo, para no descartar sincronizaciones offline legítimas)
             if (!esSincronizacionOffline && historialAccesoDAO.existeRegistroReciente(idDispositivo)) {
@@ -153,6 +155,6 @@ public class RegistroAccesoServlet extends HttpServlet {
     }
 
     private String formatHoraActual() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.forLanguageTag("es-CO")));
+        return LocalDateTime.now(ZONA_COLOMBIA).format(DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.forLanguageTag("es-CO")));
     }
 }

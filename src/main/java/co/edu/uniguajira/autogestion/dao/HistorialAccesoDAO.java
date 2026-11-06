@@ -117,12 +117,13 @@ public class HistorialAccesoDAO {
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);
-            ps.setTimestamp(2, java.sql.Timestamp.valueOf(fechaEventoNuevo != null ? fechaEventoNuevo : java.time.LocalDateTime.now()));
+            java.time.LocalDateTime ahoraBogota = java.time.LocalDateTime.now(java.time.ZoneId.of("America/Bogota"));
+            ps.setTimestamp(2, java.sql.Timestamp.valueOf(fechaEventoNuevo != null ? fechaEventoNuevo : ahoraBogota));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int ultimoMovimiento = rs.getInt("id_tipo_movimiento");
                     java.time.LocalDateTime ultimaFecha = rs.getTimestamp("fecha_hora_evento").toLocalDateTime();
-                    long segundos = java.time.Duration.between(ultimaFecha, fechaEventoNuevo != null ? fechaEventoNuevo : java.time.LocalDateTime.now()).getSeconds();
+                    long segundos = java.time.Duration.between(ultimaFecha, fechaEventoNuevo != null ? fechaEventoNuevo : ahoraBogota).getSeconds();
                     
                     // Si el toque ocurre en menos de 5 segundos se marca no permitido (antirrebote)
                     if (segundos < 5 && segundos >= 0) {

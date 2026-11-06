@@ -266,9 +266,40 @@ function avanzarA(idPantalla) {
   mostrarPantalla(idPantalla);
 }
 
+/* Limpia todo el estado de autenticación de la sesión actual.
+   Se llama cuando el usuario retrocede a la pantalla de identificación
+   o cuando se cierra una sesión, para evitar que un perfil anterior
+   quede en memoria y se pueda saltear el flujo de PIN. */
+function limpiarEstadoSesion() {
+  estado.pinSesion = '';
+  estado.idEstudiante = null;
+  estado.equipos = [];
+  estado.tienePin = false;
+  estado.perfil = null;
+  estado.nombre = '';
+  estado.identificador = '';
+  estado.datosPendientesPin = null;
+  estado.equipoPendientePin = null;
+  estado.pinIngresado = '';
+  estado.pinModo = 'verificar';
+  estado.pinNuevoTemporal = '';
+  estado.pinBloqueado = false;
+  estado.destinoTrasConsentimiento = null;
+  estado.equipoEditando = null;
+  estado.equipoAcciones = null;
+  // Limpiar UI de identificación
+  const campoDoc = $('#campo-documento');
+  if (campoDoc) {
+    campoDoc.value = '';
+    campoDoc.placeholder = '0000000000';
+  }
+  mostrarError('#error-identificacion', '');
+}
+
 function volverAlInicio() {
   const d = estado.historyDepth;
   estado.historyDepth = 0;
+  limpiarEstadoSesion();
   if (d > 0) history.go(-d);
   mostrarPantalla('pantalla-identificacion');
 }
@@ -279,11 +310,19 @@ window.addEventListener('popstate', (e) => {
     estado.historyDepth = e.state.depth || 0;
     // Regla que no se negocia: nunca volver a una confirmación ya cerrada
     if (s === 'pantalla-confirmacion') {
+      limpiarEstadoSesion();
       volverAlInicio();
+    } else if (s === 'pantalla-identificacion' || s === 'pantalla-pin') {
+      // Si se retrocede a identificación o pin, limpiar toda la sesión
+      // para evitar que el perfil anterior siga activo en memoria
+      limpiarEstadoSesion();
+      mostrarPantalla('pantalla-identificacion');
     } else {
       mostrarPantalla(s);
     }
   } else {
+    // Sin estado de historial → limpiar y volver al inicio
+    limpiarEstadoSesion();
     mostrarPantalla('pantalla-identificacion');
   }
 });
@@ -1233,7 +1272,8 @@ async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
   try {
     const params = {
       idEstudiante: estado.idEstudiante,
-      idDispositivo: equipo.id
+      idDispositivo: equipo.id,
+      fechaEvento: fechaEvento
     };
     if (pinConfirmado) {
       params.pin = pinConfirmado;
@@ -1442,11 +1482,7 @@ function cancelarAutocierre() {
 function cerrarConfirmacion() {
   cancelarAutocierre();
   $('#pantalla-confirmacion').style.display = 'none';
-  estado.idEstudiante = null;
-  estado.nombre = '';
-  estado.equipos = [];
-  estado.perfil = null;
-  estado.pinSesion = '';
+  // limpiarEstadoSesion() ya es llamado dentro de volverAlInicio()
   volverAlInicio();
 }
 
@@ -1684,12 +1720,19 @@ function iniciar() {
   // Back buttons
   $('#boton-atras-equipo')?.addEventListener('click', () => {
     const destino = $('#boton-atras-equipo').dataset.volver || 'pantalla-identificacion';
-    mostrarPantalla(destino);
+    // Si el destino es identificación o anterior a equipos, limpiar sesión
+    if (destino === 'pantalla-identificacion' || destino === 'pantalla-pin') {
+      volverAlInicio();
+    } else {
+      mostrarPantalla(destino);
+    }
   });
   document.querySelectorAll('[data-volver]').forEach((b) => {
     b.addEventListener('click', () => {
       const destino = b.dataset.volver;
-      if (destino) {
+      if (destino === 'pantalla-identificacion' || destino === 'pantalla-pin') {
+        volverAlInicio();
+      } else if (destino) {
         mostrarPantalla(destino);
       } else {
         history.back();
