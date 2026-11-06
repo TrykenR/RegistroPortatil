@@ -26,7 +26,7 @@
 'use strict';
 
 // Subir este número obliga a refrescar la caché en todos los celulares.
-const VERSION_CACHE = 'autogestion-v8';
+const VERSION_CACHE = 'autogestion-v10';
 
 const ARCHIVOS_DEL_SHELL = [
     './',
@@ -35,6 +35,8 @@ const ARCHIVOS_DEL_SHELL = [
     './app.js',
     './db-offline.js',
     './manifest.webmanifest',
+    './fuentes/figtree-latin.woff2',
+    './fuentes/figtree-latin-ext.woff2',
     './iconos/icono-192.png',
     './iconos/icono-512.png'
 ];

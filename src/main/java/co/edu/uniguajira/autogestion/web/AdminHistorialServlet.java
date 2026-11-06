@@ -50,6 +50,7 @@ import java.util.StringJoiner;
 public class AdminHistorialServlet extends HttpServlet {
 
     private static final int FILAS_POR_PAGINA = 25;
+    private static final int FILAS_MAXIMAS_EXPORTACION = 10000;
 
     @Override
     protected void doGet(HttpServletRequest peticion, HttpServletResponse respuesta)
@@ -85,7 +86,10 @@ public class AdminHistorialServlet extends HttpServlet {
             // Si no viene o viene mal, se asume página 1 — no es un error
             // del usuario lo bastante grave como para rechazar la petición.
         }
-        int desplazamiento = (pagina - 1) * FILAS_POR_PAGINA;
+        boolean exportar = "true".equalsIgnoreCase(peticion.getParameter("exportar"));
+        int filasPorPagina = exportar ? FILAS_MAXIMAS_EXPORTACION : FILAS_POR_PAGINA;
+        if (exportar) pagina = 1;
+        int desplazamiento = (pagina - 1) * filasPorPagina;
 
         try (Connection cn = ConexionBD.obtenerConexion()) {
 
@@ -102,7 +106,7 @@ public class AdminHistorialServlet extends HttpServlet {
             try (PreparedStatement ps = cn.prepareStatement(sqlPagina)) {
                 int i = 1;
                 for (Object valor : parametros) ps.setObject(i++, valor);
-                ps.setInt(i++, FILAS_POR_PAGINA);
+                ps.setInt(i++, filasPorPagina);
                 ps.setInt(i, desplazamiento);
 
                 try (ResultSet rs = ps.executeQuery()) {
@@ -136,7 +140,7 @@ public class AdminHistorialServlet extends HttpServlet {
                 }
             }
 
-            long totalPaginas = Math.max(1, (long) Math.ceil(totalRegistros / (double) FILAS_POR_PAGINA));
+            long totalPaginas = Math.max(1, (long) Math.ceil(totalRegistros / (double) filasPorPagina));
 
             salida.print("{"
                 + JsonUtil.campo("ok", true) + ","
@@ -176,8 +180,8 @@ public class AdminHistorialServlet extends HttpServlet {
     }
 
     /**
-     * Busca por número de documento O código estudiantil (coincidencia
-     * parcial). Escapa % y _ que el usuario pudiera escribir a mano,
+     * Busca por número de documento, código estudiantil o nombre del
+     * estudiante (coincidencia parcial). Escapa % y _ que el usuario pudiera escribir a mano,
      * para que no se interpreten como comodines de LIKE.
      */
     private void agregarFiltroDocumento(StringBuilder sql, List<Object> parametros, String valor) {
@@ -186,7 +190,8 @@ public class AdminHistorialServlet extends HttpServlet {
         String escapado = valor.replace("%", "\\%").replace("_", "\\_");
         String patron = "%" + escapado + "%";
 
-        sql.append(" AND (numero_documento LIKE ? OR codigo_estudiantil LIKE ?)");
+        sql.append(" AND (numero_documento LIKE ? OR codigo_estudiantil LIKE ? OR estudiante LIKE ?)");
+        parametros.add(patron);
         parametros.add(patron);
         parametros.add(patron);
     }

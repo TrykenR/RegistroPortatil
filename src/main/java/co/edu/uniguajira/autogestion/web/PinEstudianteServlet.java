@@ -74,17 +74,11 @@ public class PinEstudianteServlet extends HttpServlet {
                         break;
                     case INCORRECTO:
                         respuesta.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        salida.print("{" + JsonUtil.campo("ok", false) + ","
-                                + JsonUtil.campo("valido", false) + ","
-                                + JsonUtil.campo("error", "PIN incorrecto. Inténtalo de nuevo.") + ","
-                                + JsonUtil.campo("mensaje", "PIN incorrecto. Inténtalo de nuevo.") + "}");
+                        salida.print(RespuestaPin.incorrecto(estudianteDAO.intentosRestantesPin(idEstudiante)));
                         break;
                     case BLOQUEADO:
                         respuesta.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                        salida.print("{" + JsonUtil.campo("ok", false) + ","
-                                + JsonUtil.campo("bloqueado", true) + ","
-                                + JsonUtil.campo("error", "Demasiados intentos fallidos. Bloqueado temporalmente por 15 minutos.") + ","
-                                + JsonUtil.campo("mensaje", "Demasiados intentos fallidos. Bloqueado temporalmente por 15 minutos.") + "}");
+                        salida.print(RespuestaPin.bloqueado(estudianteDAO.minutosBloqueoRestantes(idEstudiante)));
                         break;
                     case NO_TIENE_PIN:
                         salida.print("{" + JsonUtil.campo("ok", true) + ","

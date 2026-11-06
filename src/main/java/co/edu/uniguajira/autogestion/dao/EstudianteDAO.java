@@ -14,6 +14,12 @@ import java.sql.SQLException;
  */
 public class EstudianteDAO {
 
+    /** Intentos fallidos de PIN permitidos antes del bloqueo temporal. */
+    public static final int MAX_INTENTOS_PIN = 4;
+
+    /** Minutos que dura el bloqueo temporal del PIN. */
+    public static final int MINUTOS_BLOQUEO_PIN = 15;
+
     /**
      * Busca por número de documento O código estudiantil.
      */
@@ -170,7 +176,7 @@ public class EstudianteDAO {
                     return ResultadoPin.CORRECTO;
                 } else {
                     registrarFalloPin(idEstudiante, intentos + 1);
-                    return (intentos + 1 >= 4) ? ResultadoPin.BLOQUEADO : ResultadoPin.INCORRECTO;
+                    return (intentos + 1 >= MAX_INTENTOS_PIN) ? ResultadoPin.BLOQUEADO : ResultadoPin.INCORRECTO;
                 }
             }
         }
@@ -187,8 +193,9 @@ public class EstudianteDAO {
 
     private void registrarFalloPin(int idEstudiante, int nuevosIntentos) throws SQLException {
         String sql;
-        if (nuevosIntentos >= 4) {
-            sql = "UPDATE Estudiantes SET intentos_pin_fallidos = ?, bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id_estudiante = ?";
+        if (nuevosIntentos >= MAX_INTENTOS_PIN) {
+            sql = "UPDATE Estudiantes SET intentos_pin_fallidos = ?, bloqueado_hasta = DATE_ADD(NOW(), INTERVAL "
+                    + MINUTOS_BLOQUEO_PIN + " MINUTE) WHERE id_estudiante = ?";
         } else {
             sql = "UPDATE Estudiantes SET intentos_pin_fallidos = ? WHERE id_estudiante = ?";
         }
@@ -197,6 +204,54 @@ public class EstudianteDAO {
             ps.setInt(1, nuevosIntentos);
             ps.setInt(2, idEstudiante);
             ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Cuántos intentos de PIN le quedan al estudiante antes del bloqueo.
+     * Se usa para avisarle en pantalla ("te quedan 2 intentos").
+     */
+    public int intentosRestantesPin(int idEstudiante) throws SQLException {
+        String sql = "SELECT intentos_pin_fallidos FROM Estudiantes WHERE id_estudiante = ?";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idEstudiante);
+            try (ResultSet rs = ps.executeQuery()) {
+                int fallidos = rs.next() ? rs.getInt(1) : 0;
+                return Math.max(0, MAX_INTENTOS_PIN - fallidos);
+            }
+        }
+    }
+
+    /**
+     * Minutos que faltan para que se levante el bloqueo del PIN
+     * (0 si no está bloqueado). Se calcula con el reloj de MySQL, el mismo
+     * que se usó para fijar bloqueado_hasta.
+     */
+    public int minutosBloqueoRestantes(int idEstudiante) throws SQLException {
+        String sql = "SELECT CEIL(TIMESTAMPDIFF(SECOND, NOW(), bloqueado_hasta) / 60) " +
+                     "  FROM Estudiantes " +
+                     " WHERE id_estudiante = ? AND bloqueado_hasta > NOW()";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idEstudiante);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Math.max(1, rs.getInt(1)) : 0;
+            }
+        }
+    }
+
+    /** Indica si el estudiante ya configuró un PIN. */
+    public boolean tienePin(int idEstudiante) throws SQLException {
+        String sql = "SELECT pin_hash FROM Estudiantes WHERE id_estudiante = ?";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idEstudiante);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return false;
+                String hash = rs.getString(1);
+                return hash != null && !hash.isBlank();
+            }
         }
     }
 

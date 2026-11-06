@@ -37,9 +37,46 @@ const EXTRA_COLORS = {
   grafito: '#3A3A3C'
 };
 
+/* ---------------------------------------------------------------
+   Equivalencias con el catálogo del servidor
+   La base de datos guarda los nombres en mayúsculas y con otros
+   términos ("LENOVO", "MAC", "PLATEADO"). Estas funciones traducen en
+   ambos sentidos para que la app muestre "Apple · Plata" y el servidor
+   reciba el id correcto, en lugar del primer valor del catálogo.
+   --------------------------------------------------------------- */
+const ALIAS_CATALOGO = { apple: 'mac', plata: 'plateado' };
+
+function claveCatalogo(nombre) {
+  return (nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+function buscarEnCatalogo(lista, nombre) {
+  const clave = claveCatalogo(nombre);
+  if (!clave) return null;
+  const equivalente = ALIAS_CATALOGO[clave] || clave;
+  return (lista || []).find((item) => claveCatalogo(item.nombre) === equivalente) || null;
+}
+
+/** Nombre de marca como lo muestra la app ("LENOVO" -> "Lenovo", "MAC" -> "Apple"). */
+function nombreMarcaUI(nombre) {
+  const clave = claveCatalogo(nombre);
+  if (clave === 'mac') return 'Apple';
+  return BRANDS.find((b) => claveCatalogo(b) === clave) || (nombre || '').trim();
+}
+
+/** Nombre de color como lo muestra la app ("PLATEADO" -> "Plata", "NEGRO" -> "Negro"). */
+function nombreColorUI(nombre) {
+  const clave = claveCatalogo(nombre);
+  if (clave === 'plateado') return 'Plata';
+  const color = COLORS.find((c) => claveCatalogo(c.name) === clave);
+  if (color) return color.name;
+  const texto = (nombre || '').trim();
+  return texto ? texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase() : '';
+}
+
 function getColorHex(name) {
   if (!name) return '#C9C2B7';
-  const k = name.trim().toLowerCase();
+  const k = nombreColorUI(name).toLowerCase();
   const found = COLORS.find((c) => c.name.toLowerCase() === k);
   if (found) return found.hex;
   return EXTRA_COLORS[k] || '#C9C2B7';
@@ -72,7 +109,7 @@ function renderLaptopGlyph(brand, colorName, size = 80) {
   const fill = getColorHex(colorName);
   const light = isColorLight(fill);
   const ink = light ? 'rgba(36,28,22,.62)' : 'rgba(255,255,255,.85)';
-  const b = (brand || '').trim();
+  const b = nombreMarcaUI(brand);
 
   let emblemSvg = '';
   switch (b) {
@@ -160,7 +197,13 @@ const estado = {
   pinModo: 'verificar', // 'verificar' | 'configurar' | 'confirmar_config' | 'salida_temprana'
   pinNuevoTemporal: '',
   datosPendientesPin: null,
-  equipoPendientePin: null
+  equipoPendientePin: null,
+  perfil: null,            // respuesta completa de /estudiante, para la copia offline
+  tienePin: false,
+  pinSesion: '',           // PIN verificado en esta visita (solo en memoria)
+  pinBloqueado: false,
+  equipoEditando: null,
+  equipoAcciones: null
 };
 
 const $ = (s) => document.querySelector(s);
@@ -180,7 +223,10 @@ async function pedir(rutaRelativa, init = {}) {
   }
   const datos = await resp.json();
   if (!resp.ok) {
-    throw new Error(datos.error || datos.mensaje || 'Error en el servidor.');
+    const error = new Error(datos.error || datos.mensaje || 'Error en el servidor.');
+    error.datos = datos;
+    error.status = resp.status;
+    throw error;
   }
   return datos;
 }
@@ -323,8 +369,9 @@ async function solicitarSincronizacion() {
     if ('sync' in reg) {
       await reg.sync.register('sincronizar-accesos');
     }
-    // Siempre intentamos notificar al Service Worker por si sync está retrasado
+    // Notificar al worker para sincronizar de inmediato
     reg.active?.postMessage({ tipo: 'SINCRONIZAR' });
+    reg.active?.postMessage({ tipo: 'INTENTAR_SINCRONIZACION' });
   } catch (e) { /* ignore */ }
 }
 
@@ -378,10 +425,15 @@ async function continuarConDocumento() {
 }
 
 function aplicarEstadoEstudiante(datos) {
+  estado.pinSesion = '';
+  estado.perfil = datos;
+  estado.tienePin = datos.tienePin === true;
+
   if (datos.estado === 'NUEVO') {
     estado.idEstudiante = null;
     $('#doc-nuevo-tag').textContent = estado.identificador;
     $('#campo-pin-nuevo').value = '';
+    alternarVisibilidadPin(false);
     avanzarA('pantalla-datos-nuevo');
     $('#campo-nombres').focus();
     return;
@@ -428,6 +480,7 @@ function continuarSegunEstado(datos) {
 
 /* ============ PIN HANDLING ============ */
 function abrirPantallaVerificarPin(datos) {
+  reiniciarAvisosPin();
   estado.datosPendientesPin = datos;
   estado.pinModo = 'verificar';
   estado.pinIngresado = '';
@@ -440,6 +493,7 @@ function abrirPantallaVerificarPin(datos) {
 }
 
 function abrirPantallaPinSalidaTemprana(equipo, mensaje, minutos) {
+  reiniciarAvisosPin();
   estado.equipoPendientePin = equipo;
   estado.pinModo = 'salida_temprana';
   estado.pinIngresado = '';
@@ -452,6 +506,7 @@ function abrirPantallaPinSalidaTemprana(equipo, mensaje, minutos) {
 }
 
 function abrirPantallaConfigurarPin(datos) {
+  reiniciarAvisosPin();
   estado.datosPendientesPin = datos;
   estado.pinModo = 'configurar';
   estado.pinIngresado = '';
@@ -475,7 +530,89 @@ function actualizarPinDots() {
   });
 }
 
+/* ---------------------------------------------------------------
+   Intentos restantes y bloqueo temporal del PIN
+   --------------------------------------------------------------- */
+let relojBloqueoPin = null;
+
+function reiniciarAvisosPin() {
+  clearInterval(relojBloqueoPin);
+  relojBloqueoPin = null;
+  estado.pinBloqueado = false;
+  $('#pantalla-pin').classList.remove('pin-bloqueado-activo');
+  $('#pin-intentos').hidden = true;
+  $('#pin-bloqueo').hidden = true;
+  $('#pin-keypad').hidden = false;
+  $('#pin-dots-container').hidden = false;
+}
+
+function mostrarIntentosPin(restantes, maximos = 4) {
+  const contenedor = $('#pin-intentos');
+  const barras = $('#pin-intentos-barras');
+  barras.innerHTML = '';
+  for (let i = 0; i < maximos; i++) {
+    const barra = document.createElement('span');
+    barra.className = 'pin-intento' + (i < restantes ? ' disponible' : '');
+    barras.appendChild(barra);
+  }
+  $('#pin-intentos-texto').textContent = restantes === 1
+    ? 'Último intento antes del bloqueo'
+    : `Te quedan ${restantes} intentos`;
+  contenedor.classList.toggle('critico', restantes <= 1);
+  contenedor.hidden = false;
+}
+
+function mostrarBloqueoPin(minutos) {
+  estado.pinBloqueado = true;
+  estado.pinIngresado = '';
+  actualizarPinDots();
+  mostrarError('#error-pin', '');
+  $('#pin-intentos').hidden = true;
+  $('#pin-keypad').hidden = true;
+  $('#pin-dots-container').hidden = true;
+  $('#pin-bloqueo').hidden = false;
+  $('#pantalla-pin').classList.add('pin-bloqueado-activo');
+
+  const fin = Date.now() + Math.max(1, Number(minutos) || 15) * 60 * 1000;
+  const pintar = () => {
+    const restanteMs = Math.max(0, fin - Date.now());
+    const totalSeg = Math.ceil(restanteMs / 1000);
+    $('#pin-bloqueo-tiempo').textContent =
+      `${String(Math.floor(totalSeg / 60)).padStart(2, '0')}:${String(totalSeg % 60).padStart(2, '0')}`;
+    if (restanteMs <= 0) {
+      reiniciarAvisosPin();
+      mostrarError('#error-pin', '');
+      $('#desc-pin').textContent = 'Ya puedes intentarlo de nuevo.';
+    }
+  };
+  clearInterval(relojBloqueoPin);
+  pintar();
+  relojBloqueoPin = setInterval(pintar, 1000);
+}
+
+/** Muestra el error de un PIN rechazado por el servidor (intentos o bloqueo). */
+function manejarErrorPin(datos, mensajePorDefecto) {
+  estado.pinIngresado = '';
+  actualizarPinDots();
+  if (datos && datos.bloqueado) {
+    mostrarBloqueoPin(datos.minutosRestantes);
+    return;
+  }
+  if (datos && typeof datos.intentosRestantes === 'number') {
+    // Los intentos se muestran aparte, con barras: el error queda corto
+    mostrarError('#error-pin', 'PIN incorrecto.');
+    mostrarIntentosPin(datos.intentosRestantes, datos.intentosMaximos || 4);
+  } else {
+    mostrarError('#error-pin', (datos && datos.mensaje) || mensajePorDefecto);
+  }
+  const dotContainer = $('#pin-dots-container');
+  dotContainer.classList.remove('animate-shake');
+  void dotContainer.offsetWidth;
+  dotContainer.classList.add('animate-shake');
+}
+
 function onPinDigit(digit) {
+  if (estado.pinBloqueado) return;
   if (estado.pinIngresado.length >= 4) return;
   estado.pinIngresado += digit;
   actualizarPinDots();
@@ -515,11 +652,7 @@ async function procesarPinCompleto() {
     try {
       await registrarAcceso(eq, null, pin);
     } catch (e) {
-      mostrarError('#error-pin', e.message || 'PIN incorrecto.');
-      const dotContainer = $('#pin-dots-container');
-      dotContainer.classList.remove('animate-shake');
-      void dotContainer.offsetWidth;
-      dotContainer.classList.add('animate-shake');
+      manejarErrorPin(e.datos, e.message || 'PIN incorrecto.');
     }
     return;
   }
@@ -540,16 +673,11 @@ async function procesarPinCompleto() {
       });
       const resp = await pedir('/estudiante/pin', { method: 'POST', body: cuerpo });
       if (resp.valido) {
+        estado.pinSesion = pin;
         continuarSegunEstado(estado.datosPendientesPin);
       }
     } catch (e) {
-      estado.pinIngresado = '';
-      actualizarPinDots();
-      mostrarError('#error-pin', e.message || 'PIN incorrecto.');
-      const dotContainer = $('#pin-dots-container');
-      dotContainer.classList.remove('animate-shake');
-      void dotContainer.offsetWidth;
-      dotContainer.classList.add('animate-shake');
+      manejarErrorPin(e.datos, e.message || 'PIN incorrecto.');
     }
   } else if (estado.pinModo === 'configurar') {
     // Primer paso de configuración: pedir confirmación
@@ -580,6 +708,8 @@ async function procesarPinCompleto() {
       });
       await pedir('/estudiante/pin', { method: 'POST', body: cuerpo });
       estado.datosPendientesPin.tienePin = true;
+      estado.tienePin = true;
+      estado.pinSesion = pin;
       continuarSegunEstado(estado.datosPendientesPin);
     } catch (e) {
       mostrarError('#error-pin', e.message || 'No se pudo guardar el PIN.');
@@ -632,6 +762,17 @@ async function guardarDatosNuevo() {
     const datos = await pedir('/estudiante/nuevo', { method: 'POST', body: cuerpo });
     estado.idEstudiante = datos.idEstudiante;
     estado.nombre = nombres + ' ' + apellidos;
+    estado.tienePin = /^\d{4}$/.test(pin);
+    estado.pinSesion = estado.tienePin ? pin : '';
+    estado.perfil = {
+      estado: 'SIN_EQUIPOS',
+      idEstudiante: datos.idEstudiante,
+      nombre: estado.nombre,
+      consentimiento: true,
+      tienePin: estado.tienePin,
+      dispositivos: []
+    };
+    estado.equipos = estado.perfil.dispositivos;
 
     abrirPantallaEquipoNuevo('pantalla-datos-nuevo', true);
   } catch (error) {
@@ -677,18 +818,43 @@ async function confirmarConsentimientoExistente() {
 }
 
 /* Step 3: New Laptop */
-function abrirPantallaEquipoNuevo(pantallaAnterior, esPrimeraVez = false) {
+function abrirPantallaEquipoNuevo(pantallaAnterior, esPrimeraVez = false, equipoEditar = null) {
+  estado.equipoEditando = equipoEditar;
   $('#boton-atras-equipo').dataset.volver = pantallaAnterior;
-  $('#boton-guardar-equipo').textContent = esPrimeraVez ? 'Guardar y registrar entrada' : 'Guardar y registrar';
 
-  estado.selectedBrand = 'Lenovo';
-  estado.selectedColor = 'Gris';
-  $('#campo-alias').value = '';
+  $('#titulo-equipo').textContent = equipoEditar ? 'Editar equipo' : '¿Qué equipo traes?';
+  $('#boton-guardar-equipo').textContent = equipoEditar
+    ? 'Guardar cambios'
+    : esPrimeraVez ? 'Guardar y registrar entrada' : 'Guardar y registrar';
+
   $('#campo-otra-marca').value = '';
   $('#campo-otra-marca').style.display = 'none';
   $('#campo-otro-color').value = '';
   $('#campo-otro-color').style.display = 'none';
   mostrarError('#error-equipo-nuevo', '');
+
+  if (equipoEditar) {
+    const marca = nombreMarcaUI(equipoEditar.marca);
+    const color = nombreColorUI(equipoEditar.color);
+    const marcaConocida = BRANDS.includes(marca) && marca !== 'Otra';
+    const colorConocido = COLORS.some((c) => c.name === color);
+
+    estado.selectedBrand = marcaConocida ? marca : 'Otra';
+    if (!marcaConocida) {
+      $('#campo-otra-marca').value = marca;
+      $('#campo-otra-marca').style.display = 'block';
+    }
+    estado.selectedColor = colorConocido ? color : 'Otra';
+    if (!colorConocido) {
+      $('#campo-otro-color').value = color;
+      $('#campo-otro-color').style.display = 'block';
+    }
+    $('#campo-alias').value = equipoEditar.alias || '';
+  } else {
+    estado.selectedBrand = 'Lenovo';
+    estado.selectedColor = 'Gris';
+    $('#campo-alias').value = '';
+  }
 
   construirSelectorMarcas();
   construirSelectorColores();
@@ -776,6 +942,23 @@ $('#campo-otra-marca')?.addEventListener('input', actualizarPreviewEquipo);
 $('#campo-otro-color')?.addEventListener('input', actualizarPreviewEquipo);
 $('#campo-alias')?.addEventListener('input', actualizarPreviewEquipo);
 
+/** Traduce marca y color elegidos a los ids del catálogo del servidor. */
+async function resolverIdsCatalogo(marca, color) {
+  const catalogos = await pedir('/catalogos');
+  const marcaObj = buscarEnCatalogo(catalogos.marcas, marca) || buscarEnCatalogo(catalogos.marcas, 'Otra');
+  const colorObj = buscarEnCatalogo(catalogos.colores, color) || buscarEnCatalogo(catalogos.colores, 'Otro');
+
+  if (!marcaObj || !colorObj) {
+    throw new Error('Esa marca o ese color todavía no están en el catálogo. Pasa con el portero.');
+  }
+
+  return {
+    // Los ids pueden venir como .id, .id_marca / .id_color o .idMarca / .idColor
+    idMarca: marcaObj.id || marcaObj.id_marca || marcaObj.idMarca,
+    idColor: colorObj.id || colorObj.id_color || colorObj.idColor
+  };
+}
+
 async function guardarEquipoYRegistrar() {
   const boton = $('#boton-guardar-equipo');
   let b = estado.selectedBrand;
@@ -789,6 +972,11 @@ async function guardarEquipoYRegistrar() {
     return;
   }
 
+  if (estado.equipoEditando) {
+    await guardarCambiosEquipo(b, c, nick);
+    return;
+  }
+
   if (!navigator.onLine) {
     mostrarError('#error-equipo-nuevo', 'Agregar un equipo nuevo necesita conexión. Si ya tienes equipos guardados, vuelve atrás y elige uno.');
     return;
@@ -799,40 +987,33 @@ async function guardarEquipoYRegistrar() {
   mostrarError('#error-equipo-nuevo', '');
 
   try {
-    // 1. Obtener catálogos de la API
-    const catalogos = await pedir('/catalogos');
-    
-    // 2. Extraer los objetos de marca y color
-    const marcaObj = catalogos.marcas.find((m) => m.nombre.toLowerCase() === b.toLowerCase()) || 
-                     catalogos.marcas.find((m) => m.nombre === 'OTRA') || 
-                     catalogos.marcas[0];
-                     
-    const colorObj = catalogos.colores.find((col) => col.nombre.toLowerCase() === c.toLowerCase()) || 
-                     catalogos.colores[0];
+    const { idMarca, idColor } = await resolverIdsCatalogo(b, c);
 
-    // Extraer los IDs sin importar si vienen como .id, .id_marca / .id_color o .idMarca / .idColor
-    const idMarcaVal = marcaObj.id || marcaObj.id_marca || marcaObj.idMarca;
-    const idColorVal = colorObj.id || colorObj.id_color || colorObj.idColor;
-
-    // 3. Enviar los parámetros en ambos formatos (snake_case y camelCase) para máxima compatibilidad
+    // Se envían ambos formatos (snake_case y camelCase) por compatibilidad con el servlet
     const cuerpo = new URLSearchParams({
       idEstudiante: estado.idEstudiante,
       id_estudiante: estado.idEstudiante,
-      idMarca: idMarcaVal,
-      id_marca: idMarcaVal,
-      idColor: idColorVal,
-      id_color: idColorVal,
+      idMarca,
+      id_marca: idMarca,
+      idColor,
+      id_color: idColor,
       alias: nick
     });
 
     const nuevo = await pedir('/dispositivos', { method: 'POST', body: cuerpo });
 
-    await registrarAcceso({
+    const equipo = {
       id: nuevo.idDispositivo || nuevo.id_dispositivo,
       marca: b,
       color: c,
-      alias: nick
-    });
+      alias: nick,
+      ultimoMovimiento: 0,
+      siguienteMovimiento: 'ENTRADA'
+    };
+    estado.equipos.push(equipo);
+    guardarPerfilLocal();
+
+    await registrarAcceso(equipo);
 
   } catch (error) {
     mostrarError('#error-equipo-nuevo', error.message);
@@ -842,7 +1023,66 @@ async function guardarEquipoYRegistrar() {
   }
 }
 
+async function guardarCambiosEquipo(marca, color, alias) {
+  const boton = $('#boton-guardar-equipo');
+  const equipo = estado.equipoEditando;
+
+  if (!navigator.onLine) {
+    mostrarError('#error-equipo-nuevo', 'Editar un equipo necesita conexión.');
+    return;
+  }
+
+  boton.disabled = true;
+  boton.textContent = 'Guardando…';
+  mostrarError('#error-equipo-nuevo', '');
+
+  try {
+    const { idMarca, idColor } = await resolverIdsCatalogo(marca, color);
+    await pedir('/dispositivo/editar', {
+      method: 'POST',
+      body: new URLSearchParams({
+        idEstudiante: estado.idEstudiante,
+        idDispositivo: equipo.id,
+        idMarca,
+        idColor,
+        alias,
+        pin: estado.pinSesion
+      })
+    });
+
+    Object.assign(equipo, { marca, color, alias });
+    estado.equipoEditando = null;
+    guardarPerfilLocal();
+    pintarEquipos(estado.equipos);
+    history.back();
+    mostrarAvisoFlotante('Cambios guardados');
+  } catch (error) {
+    mostrarError('#error-equipo-nuevo', error.message);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Guardar cambios';
+  }
+}
+
+/** Mantiene al día la copia de los equipos que se usa sin conexión. */
+async function guardarPerfilLocal() {
+  if (!estado.perfil || !estado.identificador) return;
+  estado.perfil.dispositivos = estado.equipos;
+  estado.perfil.estado = estado.equipos.length ? 'FRECUENTE' : 'SIN_EQUIPOS';
+  try {
+    await self.BDOffline.guardarPerfil(estado.identificador, estado.perfil);
+  } catch (e) { /* ignore */ }
+}
+
 /* Step 4: My Laptops list */
+/** Estado del equipo según su último movimiento de hoy (1 = entrada, 2 = salida). */
+function describirEstadoEquipo(equipo) {
+  const ultimo = Number(equipo.ultimoMovimiento) || 0;
+  if (ultimo === 1) return { clase: 'adentro', etiqueta: 'Adentro', accion: 'Toca para registrar la salida' };
+  if (ultimo === 2) return { clase: 'afuera', etiqueta: 'Afuera', accion: 'Toca para registrar la entrada' };
+  return { clase: 'sin-registro', etiqueta: 'Sin registro hoy', accion: 'Toca para registrar la entrada' };
+}
+
 function pintarEquipos(dispositivos) {
   const contenedor = $('#lista-equipos');
   contenedor.innerHTML = '';
@@ -852,14 +1092,29 @@ function pintarEquipos(dispositivos) {
     avisoOff.style.display = (!navigator.onLine) ? 'flex' : 'none';
   }
 
+  $('#pista-equipos').hidden = dispositivos.length === 0;
+
+  if (dispositivos.length === 0) {
+    const vacio = document.createElement('li');
+    vacio.className = 'laptops-vacio animate-rise';
+    vacio.innerHTML = '<strong>No tienes equipos registrados.</strong><span>Agrega uno para registrar su entrada.</span>';
+    contenedor.appendChild(vacio);
+    return;
+  }
+
   dispositivos.forEach((d, i) => {
+    const marca = nombreMarcaUI(d.marca);
+    const color = nombreColorUI(d.color);
+    const estadoEquipo = describirEstadoEquipo(d);
+
     const li = document.createElement('li');
-    li.className = 'animate-rise';
+    li.className = 'laptop-item animate-rise';
     li.style.animationDelay = `${i * 70}ms`;
 
     const btn = document.createElement('button');
     btn.className = 'laptop-item-btn';
     btn.type = 'button';
+    btn.setAttribute('aria-label', `${marca} ${color}${d.alias ? ', ' + d.alias : ''}. ${estadoEquipo.etiqueta}. ${estadoEquipo.accion}.`);
 
     const glyphWrap = document.createElement('span');
     glyphWrap.className = 'laptop-glyph-wrap';
@@ -867,16 +1122,85 @@ function pintarEquipos(dispositivos) {
 
     const info = document.createElement('span');
     info.className = 'laptop-info';
-    info.innerHTML = `
-      <span class="laptop-brand">${d.marca}</span>
-      <span class="laptop-color">${d.color}</span>
-      ${d.alias ? `<span class="laptop-nick">“${d.alias}”</span>` : ''}
-    `;
+
+    const nombreMarca = document.createElement('span');
+    nombreMarca.className = 'laptop-brand';
+    nombreMarca.textContent = marca;
+
+    const nombreColor = document.createElement('span');
+    nombreColor.className = 'laptop-color';
+    nombreColor.textContent = color;
+    info.append(nombreMarca, nombreColor);
+
+    if (d.alias) {
+      const apodo = document.createElement('span');
+      apodo.className = 'laptop-nick';
+      apodo.textContent = `“${d.alias}”`;
+      info.appendChild(apodo);
+    }
+
+    const chip = document.createElement('span');
+    chip.className = `laptop-estado laptop-estado-${estadoEquipo.clase}`;
+    chip.innerHTML = '<span class="laptop-estado-punto" aria-hidden="true"></span>';
+    chip.append(estadoEquipo.etiqueta);
+    info.appendChild(chip);
 
     btn.append(glyphWrap, info);
-    btn.addEventListener('click', () => registrarAcceso(d, btn));
-    li.appendChild(btn);
+    btn.addEventListener('click', () => {
+      // Un toque largo abre las opciones; ese mismo gesto no debe registrar el acceso.
+      if (btn.dataset.pulsacionLarga === '1') {
+        delete btn.dataset.pulsacionLarga;
+        return;
+      }
+      registrarAcceso(d, btn);
+    });
+    activarPulsacionLarga(btn, () => abrirHojaEquipo(d, masOpciones));
+
+    const masOpciones = document.createElement('button');
+    masOpciones.type = 'button';
+    masOpciones.className = 'laptop-more-btn';
+    masOpciones.setAttribute('aria-label', `Opciones de ${marca} ${color}`);
+    masOpciones.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+    masOpciones.addEventListener('click', () => abrirHojaEquipo(d, masOpciones));
+
+    li.append(btn, masOpciones);
     contenedor.appendChild(li);
+  });
+}
+
+/** Mantener pulsado (o clic derecho) ejecuta una acción secundaria. */
+function activarPulsacionLarga(boton, alPulsarLargo) {
+  const DURACION_MS = 550;
+  let reloj = null;
+  let inicio = null;
+
+  const disparar = () => {
+    clearTimeout(reloj);
+    boton.classList.remove('presionando');
+    if (boton.dataset.pulsacionLarga === '1') return;
+    boton.dataset.pulsacionLarga = '1';
+    if (navigator.vibrate) navigator.vibrate(15);
+    alPulsarLargo();
+  };
+  const cancelar = () => {
+    clearTimeout(reloj);
+    boton.classList.remove('presionando');
+  };
+
+  boton.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    delete boton.dataset.pulsacionLarga;
+    inicio = { x: e.clientX, y: e.clientY };
+    boton.classList.add('presionando');
+    reloj = setTimeout(disparar, DURACION_MS);
+  });
+  boton.addEventListener('pointermove', (e) => {
+    if (inicio && Math.hypot(e.clientX - inicio.x, e.clientY - inicio.y) > 10) cancelar();
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((tipo) => boton.addEventListener(tipo, cancelar));
+  boton.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    disparar();
   });
 }
 
@@ -903,6 +1227,14 @@ async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
     const respuesta = await fetch(BASE_API + '/accesos', conCabecerasNgrok({ method: 'POST', body: cuerpo }));
     const datos = await respuesta.json();
 
+    // PIN de salida temprana rechazado: se muestra en la misma pantalla del PIN
+    if (datos.errorPin) {
+      document.querySelectorAll('.laptop-item-btn').forEach((b) => (b.disabled = false));
+      if (botonTocado) botonTocado.classList.remove('busy');
+      manejarErrorPin(datos, 'PIN incorrecto.');
+      return;
+    }
+
     // Caso: Salida anticipada requiere PIN
     if (datos.requierePin) {
       document.querySelectorAll('.laptop-item-btn').forEach((b) => (b.disabled = false));
@@ -925,6 +1257,9 @@ async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
       }, false);
       return;
     }
+
+    if (pinConfirmado) estado.pinSesion = pinConfirmado;
+    actualizarMovimientoEquipo(equipo, datos.movimiento);
 
     pintarConfirmacion({
       marca: datos.marca,
@@ -951,27 +1286,20 @@ async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
   }
 }
 
+/** Actualiza "Adentro / Afuera" del equipo y la copia offline tras un registro. */
+function actualizarMovimientoEquipo(equipo, movimiento) {
+  if (movimiento !== 'ENTRADA' && movimiento !== 'SALIDA') return;
+  equipo.ultimoMovimiento = movimiento === 'ENTRADA' ? 1 : 2;
+  equipo.siguienteMovimiento = movimiento === 'ENTRADA' ? 'SALIDA' : 'ENTRADA';
+  guardarPerfilLocal();
+}
+
 async function encolarYConfirmar(equipo, fechaEvento) {
   try {
-    // Determinar alternancia offline según el último estado conocido del equipo
-    let movDeterminado = 'ENTRADA';
-    if (equipo.siguienteMovimiento) {
-      movDeterminado = equipo.siguienteMovimiento;
-    } else if (equipo.ultimoMovimiento === 1) {
-      movDeterminado = 'SALIDA';
-    } else if (equipo.ultimoMovimiento === 2) {
-      movDeterminado = 'ENTRADA';
-    }
-
-    // Alternar localmente para próximas marcaciones en esta misma sesión offline
-    equipo.ultimoMovimiento = (movDeterminado === 'ENTRADA') ? 1 : 2;
-    equipo.siguienteMovimiento = (movDeterminado === 'ENTRADA') ? 'SALIDA' : 'ENTRADA';
-
     await self.BDOffline.encolarPendiente({
       idEstudiante: estado.idEstudiante,
       idDispositivo: equipo.id,
       fechaEvento,
-      movimiento: movDeterminado,
       marca: equipo.marca,
       color: equipo.color,
       hex: getColorHex(equipo.color)
@@ -980,10 +1308,15 @@ async function encolarYConfirmar(equipo, fechaEvento) {
     await solicitarSincronizacion();
     await actualizarBarraEstado();
 
+    // Sin red no se sabe qué decidirá el servidor; se usa el movimiento
+    // esperado según el último estado conocido del equipo.
+    const movimientoEsperado = equipo.siguienteMovimiento === 'SALIDA' ? 'SALIDA' : 'ENTRADA';
+    actualizarMovimientoEquipo(equipo, movimientoEsperado);
+
     pintarConfirmacion({
       marca: equipo.marca,
       color: equipo.color,
-      movimiento: movDeterminado,
+      movimiento: movimientoEsperado,
       hora: formatHora(new Date())
     }, true);
 
@@ -1024,8 +1357,8 @@ function pintarConfirmacion(datos, esOffline) {
   // Rule 3: FitLine cq sizing for brand and color
   const brandEl = $('#confirm-line-brand');
   const colorEl = $('#confirm-line-color');
-  const brandText = datos.marca || '';
-  const colorText = datos.color || '';
+  const brandText = nombreMarcaUI(datos.marca || '');
+  const colorText = nombreColorUI(datos.color || '');
   brandEl.textContent = brandText;
   colorEl.textContent = colorText;
 
@@ -1051,6 +1384,163 @@ function pintarConfirmacion(datos, esOffline) {
 
   avanzarA('pantalla-confirmacion');
   if (navigator.vibrate) navigator.vibrate(120);
+
+  // Las alertas de seguridad no se cierran solas: el portero debe verlas.
+  programarAutocierre(!datos.esAlerta);
+}
+
+/* ---------------------------------------------------------------
+   Cierre automático de la confirmación
+   --------------------------------------------------------------- */
+const SEGUNDOS_AUTOCIERRE = 6;
+let temporizadorAutocierre = null;
+
+function programarAutocierre(activo) {
+  cancelarAutocierre();
+  const barra = $('#confirm-autocierre-barra');
+  $('#confirm-autocierre').hidden = !activo;
+  $('#confirm-autocierre-texto').hidden = !activo;
+  if (!activo) return;
+
+  barra.style.animation = 'none';
+  void barra.offsetWidth;
+  barra.style.animation = `autocierre ${SEGUNDOS_AUTOCIERRE}s linear forwards`;
+  temporizadorAutocierre = setTimeout(cerrarConfirmacion, SEGUNDOS_AUTOCIERRE * 1000);
+}
+
+function cancelarAutocierre() {
+  clearTimeout(temporizadorAutocierre);
+  temporizadorAutocierre = null;
+}
+
+function cerrarConfirmacion() {
+  cancelarAutocierre();
+  $('#pantalla-confirmacion').style.display = 'none';
+  estado.idEstudiante = null;
+  estado.nombre = '';
+  estado.equipos = [];
+  estado.perfil = null;
+  estado.pinSesion = '';
+  volverAlInicio();
+}
+
+/* ---------------------------------------------------------------
+   Hoja de acciones de un equipo: editar o eliminar
+   --------------------------------------------------------------- */
+let origenHojaEquipo = null;
+
+function abrirHojaEquipo(equipo, origen) {
+  estado.equipoAcciones = equipo;
+  origenHojaEquipo = origen || null;
+
+  const marca = nombreMarcaUI(equipo.marca);
+  const color = nombreColorUI(equipo.color);
+  $('#hoja-equipo-glifo').innerHTML = renderLaptopGlyph(equipo.marca, equipo.color, 64);
+  $('#hoja-equipo-titulo').textContent = `${marca} · ${color}`;
+  $('#hoja-equipo-alias').textContent = equipo.alias ? `“${equipo.alias}”` : '';
+  $('#hoja-equipo-alias').hidden = !equipo.alias;
+
+  $('#hoja-equipo-acciones').hidden = false;
+  $('#hoja-equipo-confirmar').hidden = true;
+  $('#boton-cerrar-hoja').textContent = 'Cancelar';
+  mostrarError('#error-hoja-equipo', '');
+
+  // Editar o eliminar exige conexión y, si el estudiante tiene PIN, haberlo verificado.
+  let aviso = '';
+  if (!navigator.onLine) {
+    aviso = 'Necesitas conexión para editar o eliminar tus equipos.';
+  } else if (estado.tienePin && !estado.pinSesion) {
+    aviso = 'Vuelve a identificarte con tu PIN para editar o eliminar tus equipos.';
+  }
+  $('#hoja-equipo-aviso').textContent = aviso;
+  $('#hoja-equipo-aviso').hidden = !aviso;
+  $('#boton-editar-equipo').disabled = Boolean(aviso);
+  $('#boton-eliminar-equipo').disabled = Boolean(aviso);
+
+  $('#hoja-equipo').hidden = false;
+  (aviso ? $('#boton-cerrar-hoja') : $('#boton-editar-equipo')).focus();
+}
+
+function cerrarHojaEquipo() {
+  $('#hoja-equipo').hidden = true;
+  estado.equipoAcciones = null;
+  if (origenHojaEquipo && document.body.contains(origenHojaEquipo)) origenHojaEquipo.focus();
+  origenHojaEquipo = null;
+}
+
+function pedirConfirmacionEliminar() {
+  $('#hoja-equipo-acciones').hidden = true;
+  $('#hoja-equipo-confirmar').hidden = false;
+  $('#boton-cerrar-hoja').textContent = 'No, conservarlo';
+  $('#boton-confirmar-eliminar').focus();
+}
+
+async function eliminarEquipoSeleccionado() {
+  const equipo = estado.equipoAcciones;
+  if (!equipo) return;
+  const boton = $('#boton-confirmar-eliminar');
+  boton.disabled = true;
+  boton.textContent = 'Eliminando…';
+  mostrarError('#error-hoja-equipo', '');
+
+  try {
+    await pedir('/dispositivo/eliminar', {
+      method: 'POST',
+      body: new URLSearchParams({
+        idEstudiante: estado.idEstudiante,
+        idDispositivo: equipo.id,
+        pin: estado.pinSesion
+      })
+    });
+
+    estado.equipos.splice(estado.equipos.indexOf(equipo), 1);
+    guardarPerfilLocal();
+    origenHojaEquipo = null;
+    cerrarHojaEquipo();
+    pintarEquipos(estado.equipos);
+    mostrarAvisoFlotante('Equipo eliminado');
+  } catch (error) {
+    mostrarError('#error-hoja-equipo', error.message);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Sí, eliminar';
+  }
+}
+
+function editarEquipoSeleccionado() {
+  const equipo = estado.equipoAcciones;
+  if (!equipo) return;
+  origenHojaEquipo = null;
+  cerrarHojaEquipo();
+  abrirPantallaEquipoNuevo('pantalla-equipos', false, equipo);
+}
+
+let relojAvisoFlotante = null;
+function mostrarAvisoFlotante(texto) {
+  const aviso = $('#aviso-flotante');
+  aviso.textContent = texto;
+  aviso.hidden = false;
+  aviso.classList.remove('visible');
+  void aviso.offsetWidth;
+  aviso.classList.add('visible');
+  clearTimeout(relojAvisoFlotante);
+  relojAvisoFlotante = setTimeout(() => {
+    aviso.classList.remove('visible');
+    aviso.hidden = true;
+  }, 2600);
+}
+
+/** Muestra u oculta los números del PIN mientras el estudiante lo crea. */
+function alternarVisibilidadPin(mostrar) {
+  const campo = $('#campo-pin-nuevo');
+  const boton = $('#boton-ver-pin');
+  if (!campo || !boton) return;
+  campo.type = mostrar ? 'text' : 'password';
+  boton.setAttribute('aria-pressed', String(mostrar));
+  boton.setAttribute('aria-label', mostrar ? 'Ocultar PIN' : 'Mostrar PIN');
+  // En SVG, "hidden" es solo atributo (no propiedad): se alterna con toggleAttribute
+  boton.querySelector('.icono-ojo').toggleAttribute('hidden', mostrar);
+  boton.querySelector('.icono-ojo-tachado').toggleAttribute('hidden', !mostrar);
 }
 
 /* Initialization */
@@ -1097,7 +1587,9 @@ function iniciar() {
 
   // Soporte teclado físico para el PIN
   window.addEventListener('keydown', (e) => {
-    if ($('#pantalla-pin')?.style.display === 'flex') {
+    if ($('#modal-guia')?.style.display === 'flex') return;
+    if (!$('#hoja-equipo')?.hidden) return;
+    if ($('#pantalla-pin')?.classList.contains('active')) {
       if (e.key >= '0' && e.key <= '9') {
         onPinDigit(e.key);
       } else if (e.key === 'Backspace') {
@@ -1141,12 +1633,32 @@ function iniciar() {
   });
 
   // Done button
-  $('#boton-listo')?.addEventListener('click', () => {
-    $('#pantalla-confirmacion').style.display = 'none';
-    estado.idEstudiante = null;
-    estado.nombre = '';
-    estado.equipos = [];
+  $('#boton-listo')?.addEventListener('click', cerrarConfirmacion);
+
+  // Ver / ocultar el PIN nuevo
+  $('#boton-ver-pin')?.addEventListener('click', () => {
+    alternarVisibilidadPin($('#campo-pin-nuevo').type === 'password');
+  });
+  $('#campo-pin-nuevo')?.addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+  });
+
+  // PIN bloqueado
+  $('#boton-bloqueo-inicio')?.addEventListener('click', () => {
+    reiniciarAvisosPin();
     volverAlInicio();
+  });
+
+  // Hoja de acciones de equipo
+  $('#boton-editar-equipo')?.addEventListener('click', editarEquipoSeleccionado);
+  $('#boton-eliminar-equipo')?.addEventListener('click', pedirConfirmacionEliminar);
+  $('#boton-confirmar-eliminar')?.addEventListener('click', eliminarEquipoSeleccionado);
+  $('#boton-cerrar-hoja')?.addEventListener('click', cerrarHojaEquipo);
+  $('#hoja-equipo')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) cerrarHojaEquipo();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#hoja-equipo').hidden) cerrarHojaEquipo();
   });
 
   $('#boton-olvidar')?.addEventListener('click', () => {
@@ -1181,9 +1693,8 @@ function iniciar() {
    COMPORTAMIENTO GUÍA DE USO
    ===================================================================== */
 function iniciarGuiaDeUso() {
-  const tagTexto = $('#guia-tag-texto');
   const modal = $('#modal-guia');
-  const btnAbrir = $('#btn-abrir-guia');
+  const botonesAbrir = document.querySelectorAll('[data-abrir-guia]');
   const btnCerrar = $('#btn-cerrar-guia');
   const btnCerrar2 = $('#btn-cerrar-guia-2');
   const btnEntendido = $('#btn-entendido-guia');
@@ -1194,30 +1705,9 @@ function iniciarGuiaDeUso() {
   const btnIrAdmin = $('#btn-guia-ir-admin');
   const btnVolverEstudiante = $('#btn-guia-volver-estudiante');
 
-  if (!btnAbrir || !modal) return;
+  if (!botonesAbrir.length || !modal) return;
 
-  // Al entrar, la etiqueta "Guía de uso" se muestra y se oculta automáticamente a los 2.5 segundos
-  setTimeout(() => {
-    if (tagTexto) {
-      tagTexto.classList.add('escondido');
-    }
-  }, 2500);
-
-  // Al pasar el mouse por encima vuelve a mostrar la etiqueta si el usuario quiere leerla
-  btnAbrir.addEventListener('mouseenter', () => {
-    if (tagTexto) tagTexto.classList.remove('escondido');
-  });
-  btnAbrir.addEventListener('mouseleave', () => {
-    if (tagTexto) tagTexto.classList.add('escondido');
-  });
-
-  const abrirModal = () => {
-    mostrarTarjetaEstudiante();
-    modal.style.display = 'flex';
-  };
-  const cerrarModal = () => {
-    modal.style.display = 'none';
-  };
+  let botonOrigen = null;
 
   const mostrarTarjetaAdmin = () => {
     if (cardEstudiante) cardEstudiante.style.display = 'none';
@@ -1229,7 +1719,19 @@ function iniciarGuiaDeUso() {
     if (cardEstudiante) cardEstudiante.style.display = 'flex';
   };
 
-  btnAbrir.addEventListener('click', abrirModal);
+  const abrirModal = (evento) => {
+    botonOrigen = evento?.currentTarget || null;
+    mostrarTarjetaEstudiante();
+    modal.style.display = 'flex';
+    $('#btn-cerrar-guia')?.focus();
+  };
+  const cerrarModal = () => {
+    modal.style.display = 'none';
+    // Devuelve el foco al "?" que abrió la guía
+    botonOrigen?.focus();
+  };
+
+  botonesAbrir.forEach((boton) => boton.addEventListener('click', abrirModal));
   btnCerrar?.addEventListener('click', cerrarModal);
   btnCerrar2?.addEventListener('click', cerrarModal);
   btnEntendido?.addEventListener('click', cerrarModal);
@@ -1238,9 +1740,12 @@ function iniciarGuiaDeUso() {
   btnIrAdmin?.addEventListener('click', mostrarTarjetaAdmin);
   btnVolverEstudiante?.addEventListener('click', mostrarTarjetaEstudiante);
 
-  // Cerrar al tocar fuera de la tarjeta
+  // Cerrar al tocar fuera de la tarjeta o con la tecla Escape
   modal.addEventListener('click', (e) => {
     if (e.target === modal) cerrarModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') cerrarModal();
   });
 }
 

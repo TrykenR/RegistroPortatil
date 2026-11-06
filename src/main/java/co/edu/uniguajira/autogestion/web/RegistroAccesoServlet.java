@@ -115,12 +115,14 @@ public class RegistroAccesoServlet extends HttpServlet {
 
                 // Verificar el PIN del estudiante
                 EstudianteDAO.ResultadoPin resPin = estudianteDAO.verificarPin(idEstudiante, pinParam.trim());
+                if (resPin == EstudianteDAO.ResultadoPin.BLOQUEADO) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    out.print(RespuestaPin.bloqueado(estudianteDAO.minutosBloqueoRestantes(idEstudiante)));
+                    return;
+                }
                 if (resPin != EstudianteDAO.ResultadoPin.CORRECTO && resPin != EstudianteDAO.ResultadoPin.NO_TIENE_PIN) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    String msg = (resPin == EstudianteDAO.ResultadoPin.BLOQUEADO) 
-                            ? "Demasiados intentos fallidos. PIN bloqueado temporalmente por 15 minutos."
-                            : "PIN incorrecto. Inténtalo de nuevo.";
-                    out.printf("{\"ok\":false,\"errorPin\":true,\"mensaje\":\"%s\"}", msg);
+                    out.print(RespuestaPin.incorrecto(estudianteDAO.intentosRestantesPin(idEstudiante)));
                     return;
                 }
             }

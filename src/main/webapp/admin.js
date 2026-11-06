@@ -102,6 +102,22 @@ async function iniciar() {
         buscar();
     });
     $('#boton-limpiar').addEventListener('click', limpiarFiltros);
+    $('#boton-exportar').addEventListener('click', exportarCsv);
+    $('#boton-actualizar-alertas').addEventListener('click', cargarAlertas);
+    $('#boton-ver-todas-alertas').addEventListener('click', () => {
+        alertasExpandidas = !alertasExpandidas;
+        pintarAlertas(ultimasAlertas);
+    });
+    document.querySelectorAll('.chip-rango').forEach((chip) => {
+        chip.addEventListener('click', () => aplicarRangoRapido(chip.dataset.rango));
+    });
+    ['#filtro-desde', '#filtro-hasta'].forEach((selector) => {
+        // Cambiar una fecha a mano deja de ser un atajo ("Hoy", "Ayer"...)
+        $(selector).addEventListener('input', () => {
+            rangoActivo = '';
+            actualizarChipsRango();
+        });
+    });
     $('#boton-pagina-anterior').addEventListener('click', () => cambiarPagina(-1));
     $('#boton-pagina-siguiente').addEventListener('click', () => cambiarPagina(1));
     window.addEventListener('pagehide', cerrarSesionAlSalir);
@@ -202,6 +218,10 @@ function volverAlLogin(mensaje) {
     // esté "cerrada": se borran de la pantalla, no solo se ocultan.
     $('#cuerpo-tabla').innerHTML = '';
     $('#cuerpo-tabla-intentos').innerHTML = '';
+    $('#lista-alertas').innerHTML = '';
+    ultimasAlertas = [];
+    ['#grafica-entradas', '#grafica-salidas'].forEach((selector) => { $(selector).innerHTML = ''; });
+    ['#kpi-entradas', '#kpi-salidas', '#kpi-adentro', '#kpi-offline'].forEach((selector) => { $(selector).textContent = '0'; });
     paginaActual = 1;
     mostrarError('#error-login', mensaje);
 }
@@ -286,11 +306,17 @@ async function mostrarPanel() {
         console.warn('Error al cargar catálogos:', e);
     }
 
+    // Los selectores ya tienen sus opciones: se pueden restaurar los filtros guardados
+    restaurarFiltros();
+
     try {
         await buscar();
     } catch (e) {
         console.warn('Error al buscar:', e);
     }
+
+    cargarResumen();
+    cargarAlertas();
 
     try {
         await cargarIntentos();
@@ -415,15 +441,10 @@ async function buscar() {
     mostrarError('#error-panel', '');
     $('#resumen-resultados').textContent = 'Buscando…';
 
-    const parametros = new URLSearchParams();
-    agregarSiTieneValor(parametros, 'documento', $('#filtro-documento').value.trim());
-    agregarSiTieneValor(parametros, 'marca', $('#filtro-marca').value);
-    agregarSiTieneValor(parametros, 'color', $('#filtro-color').value);
-    agregarSiTieneValor(parametros, 'movimiento', $('#filtro-movimiento').value);
-    agregarSiTieneValor(parametros, 'origen', $('#filtro-origen').value);
-    agregarSiTieneValor(parametros, 'fechaDesde', $('#filtro-desde').value);
-    agregarSiTieneValor(parametros, 'fechaHasta', $('#filtro-hasta').value);
+    const parametros = parametrosDeFiltro();
     parametros.set('pagina', paginaActual);
+    guardarFiltros();
+    actualizarChipsRango();
 
     try {
         const respuesta = await fetch('api/admin/historial?' + parametros.toString(), conCabecerasNgrok());
@@ -443,7 +464,9 @@ async function buscar() {
 
         pintarResultados(datos.registros, datos.totalRegistros);
         actualizarControlesPaginacion(datos.pagina, datos.totalPaginas);
-        actualizarKpiStats(datos.registros);
+        actualizarBotonLimpiar();
+        // Si el servidor no tiene /api/admin/resumen, las tarjetas se calculan con esta página
+        if (!resumenDisponible) actualizarKpiStats(datos.registros);
 
         // Renueva el reloj al interactuar con éxito
         tiempoRestanteMs = DURACION_SESION_MS;
@@ -481,8 +504,385 @@ function agregarSiTieneValor(parametros, clave, valor) {
 
 function limpiarFiltros() {
     $('#formulario-filtros').reset();
+    rangoActivo = '';
+    try { localStorage.removeItem(CLAVE_FILTROS); } catch (e) { /* ignorar */ }
     paginaActual = 1;
     buscar();
+}
+
+/** Filtros del formulario como parámetros de /api/admin/historial. */
+function parametrosDeFiltro() {
+    const parametros = new URLSearchParams();
+    agregarSiTieneValor(parametros, 'documento', $('#filtro-documento').value.trim());
+    agregarSiTieneValor(parametros, 'marca', $('#filtro-marca').value);
+    agregarSiTieneValor(parametros, 'color', $('#filtro-color').value);
+    agregarSiTieneValor(parametros, 'movimiento', $('#filtro-movimiento').value);
+    agregarSiTieneValor(parametros, 'origen', $('#filtro-origen').value);
+    agregarSiTieneValor(parametros, 'fechaDesde', $('#filtro-desde').value);
+    agregarSiTieneValor(parametros, 'fechaHasta', $('#filtro-hasta').value);
+    return parametros;
+}
+
+function actualizarBotonLimpiar() {
+    const hayFiltros = ['#filtro-documento', '#filtro-marca', '#filtro-color', '#filtro-movimiento',
+        '#filtro-origen', '#filtro-desde', '#filtro-hasta'].some((selector) => $(selector).value);
+    $('#boton-limpiar').hidden = !hayFiltros;
+}
+
+/* ---------------------------------------------------------------
+   FILTROS RECORDADOS Y ATAJOS DE FECHA
+   Se recuerdan en este navegador marca, color, movimiento, origen y
+   fechas. La búsqueda por nombre o documento NO se guarda, para no
+   dejar datos personales en un computador compartido de portería.
+   --------------------------------------------------------------- */
+const CLAVE_FILTROS = 'panel_filtros_v1';
+const CAMPOS_RECORDADOS = {
+    marca: '#filtro-marca',
+    color: '#filtro-color',
+    movimiento: '#filtro-movimiento',
+    origen: '#filtro-origen',
+    desde: '#filtro-desde',
+    hasta: '#filtro-hasta'
+};
+let rangoActivo = '';
+
+function guardarFiltros() {
+    const filtros = { rango: rangoActivo };
+    Object.entries(CAMPOS_RECORDADOS).forEach(([clave, selector]) => {
+        filtros[clave] = $(selector).value;
+    });
+    try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify(filtros)); } catch (e) { /* ignorar */ }
+}
+
+function restaurarFiltros() {
+    let filtros = null;
+    try { filtros = JSON.parse(localStorage.getItem(CLAVE_FILTROS) || 'null'); } catch (e) { filtros = null; }
+    if (!filtros) return;
+
+    Object.entries(CAMPOS_RECORDADOS).forEach(([clave, selector]) => {
+        const campo = $(selector);
+        const valor = filtros[clave] || '';
+        // Un valor que ya no existe en el catálogo se ignora
+        if (campo.tagName === 'SELECT' && valor && !Array.from(campo.options).some((o) => o.value === valor)) return;
+        campo.value = valor;
+    });
+
+    // "Hoy", "Ayer" y "Esta semana" se recalculan: mañana "Hoy" sigue siendo hoy
+    if (filtros.rango) {
+        const fechas = calcularRango(filtros.rango);
+        if (fechas) {
+            rangoActivo = filtros.rango;
+            $('#filtro-desde').value = fechas.desde;
+            $('#filtro-hasta').value = fechas.hasta;
+        }
+    }
+    actualizarChipsRango();
+}
+
+function fechaLocalIso(fecha) {
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${fecha.getFullYear()}-${mes}-${dia}`;
+}
+
+function calcularRango(rango) {
+    const hoy = new Date();
+    if (rango === 'hoy') {
+        return { desde: fechaLocalIso(hoy), hasta: fechaLocalIso(hoy) };
+    }
+    if (rango === 'ayer') {
+        const ayer = new Date(hoy);
+        ayer.setDate(hoy.getDate() - 1);
+        return { desde: fechaLocalIso(ayer), hasta: fechaLocalIso(ayer) };
+    }
+    if (rango === 'semana') {
+        // La semana empieza el lunes
+        const lunes = new Date(hoy);
+        lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
+        return { desde: fechaLocalIso(lunes), hasta: fechaLocalIso(hoy) };
+    }
+    return null;
+}
+
+function aplicarRangoRapido(rango) {
+    if (rangoActivo === rango) {
+        // Tocar el atajo activo lo quita
+        rangoActivo = '';
+        $('#filtro-desde').value = '';
+        $('#filtro-hasta').value = '';
+    } else {
+        const fechas = calcularRango(rango);
+        if (!fechas) return;
+        rangoActivo = rango;
+        $('#filtro-desde').value = fechas.desde;
+        $('#filtro-hasta').value = fechas.hasta;
+    }
+    paginaActual = 1;
+    buscar();
+}
+
+function actualizarChipsRango() {
+    document.querySelectorAll('.chip-rango').forEach((chip) => {
+        chip.setAttribute('aria-pressed', String(chip.dataset.rango === rangoActivo));
+    });
+}
+
+/* ---------------------------------------------------------------
+   EXPORTAR CSV (con los filtros aplicados)
+   --------------------------------------------------------------- */
+async function exportarCsv() {
+    const boton = $('#boton-exportar');
+    const textoOriginal = boton.innerHTML;
+    boton.disabled = true;
+    boton.textContent = 'Exportando…';
+    mostrarError('#error-panel', '');
+
+    try {
+        const parametros = parametrosDeFiltro();
+        parametros.set('exportar', 'true');
+        const respuesta = await fetch('api/admin/historial?' + parametros.toString(), conCabecerasNgrok());
+        if (respuesta.status === 401) {
+            volverAlLogin('Tu sesión expiró. Entra de nuevo.');
+            return;
+        }
+        const datos = await leerJson(respuesta);
+        if (!datos.ok) {
+            mostrarError('#error-panel', datos.mensaje || 'No se pudo exportar.');
+            return;
+        }
+        if (!datos.registros.length) {
+            mostrarError('#error-panel', 'No hay registros para exportar con estos filtros.');
+            return;
+        }
+
+        descargarCsv(datos.registros);
+
+        if (datos.totalRegistros > datos.registros.length) {
+            mostrarError('#error-panel',
+                `Se exportaron los ${datos.registros.length.toLocaleString('es-CO')} registros más recientes de ` +
+                `${datos.totalRegistros.toLocaleString('es-CO')}. Acota las fechas para exportar el resto.`);
+        }
+    } catch (error) {
+        mostrarError('#error-panel', mensajeDeFalla(error));
+    } finally {
+        boton.disabled = false;
+        boton.innerHTML = textoOriginal;
+    }
+}
+
+function descargarCsv(registros) {
+    // Punto y coma: Excel en español lo abre en columnas sin configurar nada
+    const SEPARADOR = ';';
+    const encabezados = ['Fecha', 'Movimiento', 'Estudiante', 'Documento', 'Código', 'Marca', 'Color', 'Origen', 'Retraso (s)'];
+
+    const celdaCsv = (valor) => {
+        let texto = valor === null || valor === undefined ? '' : String(valor);
+        // Evita que Excel interprete el contenido como fórmula
+        if (/^[=+\-@\t\r]/.test(texto)) texto = "'" + texto;
+        return /[";\n\r]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+    };
+
+    const filas = registros.map((r) => [
+        (r.fechaEvento || '').replace('T', ' ').slice(0, 19),
+        r.movimiento,
+        r.estudiante,
+        r.documento || '',
+        r.codigo || '',
+        r.marca,
+        r.color,
+        r.origen === 'OFFLINE_SINCRONIZADO' ? 'Offline sincronizado' : 'En línea',
+        r.origen === 'OFFLINE_SINCRONIZADO' ? r.segundosRetraso : 0
+    ].map(celdaCsv).join(SEPARADOR));
+
+    const contenido = '\uFEFF' + [encabezados.join(SEPARADOR), ...filas].join('\r\n');
+    const archivo = new Blob([contenido], { type: 'text/csv;charset=utf-8' });
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(archivo);
+    enlace.download = `historial-accesos-${fechaLocalIso(new Date())}.csv`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+}
+
+/* ---------------------------------------------------------------
+   RESUMEN DEL DÍA Y GRÁFICAS POR HORA
+   --------------------------------------------------------------- */
+const HORA_INICIO_GRAFICA = 6;
+const HORA_FIN_GRAFICA = 21;
+let resumenDisponible = false;
+
+async function cargarResumen() {
+    try {
+        const respuesta = await fetch('api/admin/resumen', conCabecerasNgrok());
+        if (!respuesta.ok) return;
+        const datos = await leerJson(respuesta);
+        if (!datos.ok) return;
+
+        resumenDisponible = true;
+        $('#kpi-entradas').textContent = datos.entradas;
+        $('#kpi-salidas').textContent = datos.salidas;
+        $('#kpi-adentro').textContent = datos.adentro;
+        $('#kpi-offline').textContent = datos.offline;
+        pintarGraficaHoras('#grafica-entradas', datos.porHora, 'entradas', 'entrada');
+        pintarGraficaHoras('#grafica-salidas', datos.porHora, 'salidas', 'salida');
+    } catch (e) {
+        // Servidor sin /api/admin/resumen: las tarjetas se calculan con la página actual
+    }
+}
+
+function etiquetaHora(hora) {
+    const sufijo = hora >= 12 ? 'p. m.' : 'a. m.';
+    return `${hora % 12 === 0 ? 12 : hora % 12} ${sufijo}`;
+}
+
+function pintarGraficaHoras(selector, porHora, campo, singular) {
+    const contenedor = $(selector);
+    if (!contenedor || !Array.isArray(porHora)) return;
+
+    const horas = [];
+    for (let h = HORA_INICIO_GRAFICA; h <= HORA_FIN_GRAFICA; h++) {
+        const fila = porHora.find((item) => Number(item.hora) === h);
+        horas.push({ hora: h, total: fila ? Number(fila[campo]) || 0 : 0 });
+    }
+    const maximo = Math.max(1, ...horas.map((h) => h.total));
+    const horaActual = new Date().getHours();
+    const ancho = 100 / horas.length;
+
+    const barras = horas.map((h, i) => {
+        const alto = h.total ? Math.max(3, (h.total / maximo) * 34) : 2;
+        const clase = h.hora === horaActual ? 'barra actual' : h.total ? 'barra' : 'barra vacia';
+        const descripcion = `${etiquetaHora(h.hora)}: ${h.total} ${singular}${h.total === 1 ? '' : 's'}`;
+        return `<rect class="${clase}" x="${(i * ancho + ancho * 0.18).toFixed(2)}" y="${(36 - alto).toFixed(2)}" ` +
+               `width="${(ancho * 0.64).toFixed(2)}" height="${alto.toFixed(2)}" rx="1.2"><title>${descripcion}</title></rect>`;
+    }).join('');
+
+    const pico = horas.reduce((mejor, h) => (h.total > mejor.total ? h : mejor), horas[0]);
+    contenedor.setAttribute('aria-label', pico.total
+        ? `${singular[0].toUpperCase() + singular.slice(1)}s por hora de hoy. Hora pico: ${etiquetaHora(pico.hora)} con ${pico.total}.`
+        : `Todavía no hay ${singular}s hoy.`);
+    contenedor.innerHTML = `<svg viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true">${barras}</svg>` +
+        `<div class="kpi-grafica-eje" aria-hidden="true"><span>${etiquetaHora(HORA_INICIO_GRAFICA)}</span>` +
+        `<span>${etiquetaHora(HORA_FIN_GRAFICA)}</span></div>`;
+}
+
+/* ---------------------------------------------------------------
+   ALERTAS DE SEGURIDAD
+   --------------------------------------------------------------- */
+const ALERTAS_VISIBLES = 4;
+let ultimasAlertas = [];
+let alertasExpandidas = false;
+
+const TIPOS_ALERTA = {
+    HURTO: { etiqueta: 'Reportado por hurto', clase: 'hurto' },
+    DISCREPANCIA_SALIDA: { etiqueta: 'Salida sin entrada registrada', clase: 'discrepancia' }
+};
+
+async function cargarAlertas() {
+    const boton = $('#boton-actualizar-alertas');
+    boton.disabled = true;
+    try {
+        const respuesta = await fetch('api/admin/alertas', conCabecerasNgrok());
+        if (respuesta.status === 401) return;
+        const datos = await leerJson(respuesta);
+        if (!datos.ok) throw new Error(datos.mensaje);
+        ultimasAlertas = datos.alertas || [];
+        pintarAlertas(ultimasAlertas);
+    } catch (error) {
+        $('#resumen-alertas').textContent = 'No se pudieron cargar las alertas.';
+    } finally {
+        boton.disabled = false;
+    }
+}
+
+function pintarAlertas(alertas) {
+    const lista = $('#lista-alertas');
+    const contador = $('#contador-alertas');
+    const verTodas = $('#boton-ver-todas-alertas');
+    lista.innerHTML = '';
+
+    const hurtos = alertas.filter((a) => a.tipoAlerta === 'HURTO').length;
+    contador.hidden = alertas.length === 0;
+    contador.textContent = alertas.length;
+    contador.classList.toggle('con-hurtos', hurtos > 0);
+    $('#seccion-alertas').classList.toggle('con-hurtos', hurtos > 0);
+
+    if (alertas.length === 0) {
+        $('#resumen-alertas').textContent = 'Sin alertas. Todo en orden.';
+        verTodas.hidden = true;
+        const vacio = document.createElement('li');
+        vacio.className = 'alerta-vacia';
+        vacio.innerHTML = ILUSTRACIONES_VACIO.escudo +
+            '<p class="estado-vacio-titulo">No hay equipos reportados.</p>' +
+            '<p class="estado-vacio-detalle">Los reportes de hurto y las salidas sin entrada aparecerán aquí.</p>';
+        lista.appendChild(vacio);
+        return;
+    }
+
+    $('#resumen-alertas').textContent = hurtos
+        ? `${hurtos} ${hurtos === 1 ? 'equipo reportado' : 'equipos reportados'} por hurto · ${alertas.length} en total`
+        : `${alertas.length} ${alertas.length === 1 ? 'alerta reciente' : 'alertas recientes'}`;
+
+    // Los hurtos van primero; dentro de cada grupo, la más reciente arriba
+    const ordenadas = [...alertas].sort((a, b) => {
+        const prioridad = (x) => (x.tipoAlerta === 'HURTO' ? 0 : 1);
+        return prioridad(a) - prioridad(b) || String(b.fecha).localeCompare(String(a.fecha));
+    });
+    const visibles = alertasExpandidas ? ordenadas : ordenadas.slice(0, ALERTAS_VISIBLES);
+
+    visibles.forEach((alerta) => {
+        const tipo = TIPOS_ALERTA[alerta.tipoAlerta] || {
+            etiqueta: (alerta.tipoAlerta || 'Alerta').replace(/_/g, ' ').toLowerCase(),
+            clase: 'otra'
+        };
+
+        const item = document.createElement('li');
+        item.className = `alerta alerta-${tipo.clase}`;
+
+        const icono = document.createElement('span');
+        icono.className = 'alerta-icono';
+        icono.setAttribute('aria-hidden', 'true');
+        icono.innerHTML = tipo.clase === 'hurto'
+            ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
+            : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
+
+        const cuerpo = document.createElement('div');
+        cuerpo.className = 'alerta-cuerpo';
+
+        const cabecera = document.createElement('p');
+        cabecera.className = 'alerta-cabecera';
+        const etiqueta = document.createElement('span');
+        etiqueta.className = 'alerta-tipo';
+        etiqueta.textContent = tipo.etiqueta;
+        const fecha = document.createElement('time');
+        fecha.className = 'alerta-fecha';
+        fecha.textContent = formatearFecha(alerta.fecha);
+        cabecera.append(etiqueta, fecha);
+
+        const estudiante = document.createElement('p');
+        estudiante.className = 'alerta-estudiante';
+        const identificador = alerta.documento || alerta.codigo;
+        estudiante.textContent = identificador ? `${alerta.estudiante} · ${identificador}` : alerta.estudiante;
+
+        const equipo = document.createElement('p');
+        equipo.className = 'alerta-equipo';
+        const serie = alerta.serial && alerta.serial !== 'S/N' ? ` · Serie ${alerta.serial}` : '';
+        equipo.textContent = `${alerta.marca} · ${alerta.color}${serie}`;
+
+        cuerpo.append(cabecera, estudiante, equipo);
+        if (alerta.descripcion) {
+            const descripcion = document.createElement('p');
+            descripcion.className = 'alerta-descripcion';
+            descripcion.textContent = alerta.descripcion;
+            cuerpo.appendChild(descripcion);
+        }
+
+        item.append(icono, cuerpo);
+        lista.appendChild(item);
+    });
+
+    verTodas.hidden = ordenadas.length <= ALERTAS_VISIBLES;
+    verTodas.textContent = alertasExpandidas ? 'Ver menos' : `Ver todas (${ordenadas.length})`;
 }
 
 /* ---------------------------------------------------------------
@@ -502,18 +902,63 @@ async function cargarIntentos() {
     }
 }
 
+/* ---------------------------------------------------------------
+   ESTADO VACÍO DE TABLAS (ilustración + mensaje + sugerencia)
+   --------------------------------------------------------------- */
+const ILUSTRACIONES_VACIO = {
+    portatil: `
+        <svg viewBox="0 0 120 88" width="120" height="88" aria-hidden="true">
+            <rect x="22" y="14" width="76" height="50" rx="6" fill="var(--cont)" stroke="var(--borde)" stroke-width="2"/>
+            <rect x="30" y="22" width="60" height="34" rx="3" fill="var(--superficie)"/>
+            <path d="M12 68h96l-6 8H18z" fill="var(--borde)"/>
+            <path d="M44 33h32M44 41h20" stroke="var(--borde)" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="86" cy="54" r="13" fill="var(--superficie)" stroke="var(--teal)" stroke-width="3"/>
+            <path d="m95.5 63.5 8 8" stroke="var(--teal)" stroke-width="4" stroke-linecap="round"/>
+            <rect x="84" y="48" width="4" height="4" transform="rotate(45 86 50)" fill="var(--oro)"/>
+            <rect x="84" y="55" width="4" height="4" transform="rotate(45 86 57)" fill="var(--coral)"/>
+        </svg>`,
+    escudo: `
+        <svg viewBox="0 0 120 88" width="120" height="88" aria-hidden="true">
+            <path d="M60 10 86 20v20c0 18-12 30-26 36-14-6-26-18-26-36V20z" fill="var(--cont)" stroke="var(--borde)" stroke-width="2"/>
+            <path d="m48 44 8 8 16-16" fill="none" stroke="var(--teal)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="18" y="30" width="5" height="5" transform="rotate(45 20.5 32.5)" fill="var(--oro)"/>
+            <rect x="97" y="52" width="5" height="5" transform="rotate(45 99.5 54.5)" fill="var(--coral)"/>
+        </svg>`
+};
+
+function filaVacia(columnas, ilustracion, titulo, detalle) {
+    const fila = document.createElement('tr');
+    fila.className = 'fila-vacia';
+    const celdaVacia = document.createElement('td');
+    celdaVacia.colSpan = columnas;
+    celdaVacia.className = 'sin-resultados';
+
+    const contenido = document.createElement('div');
+    contenido.className = 'estado-vacio';
+    contenido.innerHTML = ILUSTRACIONES_VACIO[ilustracion] || '';
+
+    const textoTitulo = document.createElement('p');
+    textoTitulo.className = 'estado-vacio-titulo';
+    textoTitulo.textContent = titulo;
+
+    const textoDetalle = document.createElement('p');
+    textoDetalle.className = 'estado-vacio-detalle';
+    textoDetalle.textContent = detalle;
+
+    contenido.append(textoTitulo, textoDetalle);
+    celdaVacia.appendChild(contenido);
+    fila.appendChild(celdaVacia);
+    return fila;
+}
+
 function pintarIntentos(intentos) {
     const cuerpo = $('#cuerpo-tabla-intentos');
     cuerpo.innerHTML = '';
 
     if (intentos.length === 0) {
-        const fila = document.createElement('tr');
-        const celda = document.createElement('td');
-        celda.colSpan = 4;
-        celda.className = 'sin-resultados';
-        celda.textContent = 'Todavía no hay intentos registrados.';
-        fila.appendChild(celda);
-        cuerpo.appendChild(fila);
+        cuerpo.appendChild(filaVacia(4, 'escudo',
+            'Todavía no hay intentos registrados.',
+            'Aquí aparecerán los ingresos al panel, exitosos y fallidos.'));
         return;
     }
 
@@ -546,13 +991,9 @@ function pintarResultados(registros, totalRegistros) {
         : `${totalRegistros} registros encontrados.`;
 
     if (registros.length === 0) {
-        const fila = document.createElement('tr');
-        const celda = document.createElement('td');
-        celda.colSpan = 7;
-        celda.className = 'sin-resultados';
-        celda.textContent = 'No hay registros que coincidan con estos filtros.';
-        fila.appendChild(celda);
-        cuerpo.appendChild(fila);
+        cuerpo.appendChild(filaVacia(7, 'portatil',
+            'No hay registros que coincidan con estos filtros.',
+            'Prueba con otro rango de fechas o limpia los filtros.'));
         return;
     }
 
@@ -627,17 +1068,6 @@ function actualizarKpiStats(registros) {
     const elOffline = $('#kpi-offline');
     if (elOffline) elOffline.textContent = offline;
 
-    const btnLimpiar = $('#boton-limpiar');
-    if (btnLimpiar) {
-        const hayFiltros = $('#filtro-documento').value ||
-                           $('#filtro-marca').value ||
-                           $('#filtro-color').value ||
-                           $('#filtro-movimiento').value ||
-                           $('#filtro-origen').value ||
-                           $('#filtro-desde').value ||
-                           $('#filtro-hasta').value;
-        btnLimpiar.hidden = !hayFiltros;
-    }
 }
 
 function celda(texto) {

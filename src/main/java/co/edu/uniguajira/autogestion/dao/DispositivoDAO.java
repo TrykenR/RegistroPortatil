@@ -121,6 +121,42 @@ public class DispositivoDAO {
         }
     }
 
+    /**
+     * Cambia marca, color y apodo de un equipo. El historial no se toca:
+     * los registros pasados siguen apuntando al mismo id_dispositivo.
+     */
+    public boolean actualizar(int idDispositivo, int idMarca, int idColor, String alias) throws SQLException {
+        String sql = "UPDATE Dispositivos_Estudiante " +
+                     "   SET id_marca = ?, id_color = ?, alias = ? " +
+                     " WHERE id_dispositivo = ? AND activo = TRUE";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idMarca);
+            ps.setInt(2, idColor);
+            if (alias != null && !alias.isBlank()) {
+                ps.setString(3, alias.trim());
+            } else {
+                ps.setNull(3, java.sql.Types.VARCHAR);
+            }
+            ps.setInt(4, idDispositivo);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * "Elimina" un equipo para el estudiante: se marca como inactivo para
+     * que deje de aparecer, pero se conserva para no romper el historial
+     * de entradas y salidas ni las alertas de seguridad.
+     */
+    public boolean desactivar(int idDispositivo) throws SQLException {
+        String sql = "UPDATE Dispositivos_Estudiante SET activo = FALSE WHERE id_dispositivo = ? AND activo = TRUE";
+        try (Connection cn = ConexionBD.obtenerConexion();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idDispositivo);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
     private Dispositivo mapearDispositivo(ResultSet rs) throws SQLException {
         Dispositivo d = new Dispositivo();
         d.setIdDispositivo(rs.getInt("id_dispositivo"));
