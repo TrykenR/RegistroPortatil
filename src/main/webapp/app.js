@@ -603,7 +603,10 @@ function manejarErrorPin(datos, mensajePorDefecto) {
     mostrarError('#error-pin', 'PIN incorrecto.');
     mostrarIntentosPin(datos.intentosRestantes, datos.intentosMaximos || 4);
   } else {
-    mostrarError('#error-pin', (datos && datos.mensaje) || mensajePorDefecto);
+    // Si no hay datos detallados (ej: caché vieja o error de red transitorio),
+    // nunca mostrar "Error en el servidor." para un 401 — es PIN incorrecto.
+    const msg = (datos && (datos.mensaje || datos.error)) || mensajePorDefecto || 'PIN incorrecto.';
+    mostrarError('#error-pin', msg);
   }
   const dotContainer = $('#pin-dots-container');
   dotContainer.classList.remove('animate-shake');
@@ -677,7 +680,9 @@ async function procesarPinCompleto() {
         continuarSegunEstado(estado.datosPendientesPin);
       }
     } catch (e) {
-      manejarErrorPin(e.datos, e.message || 'PIN incorrecto.');
+      // e.status === 401 → PIN incorrecto; e.status === 403 → bloqueado
+      const fallback = (e.status === 401 || e.status === 403) ? 'PIN incorrecto.' : (e.message || 'PIN incorrecto.');
+      manejarErrorPin(e.datos, fallback);
     }
   } else if (estado.pinModo === 'configurar') {
     // Primer paso de configuración: pedir confirmación
