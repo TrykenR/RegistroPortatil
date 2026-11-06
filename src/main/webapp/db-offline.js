@@ -127,6 +127,12 @@ function eliminarPendiente(idLocal) {
     );
 }
 
+function limpiarPendientes() {
+    return ejecutarTransaccion(ALMACEN_PENDIENTES, 'readwrite', (almacen) =>
+        almacen.clear()
+    );
+}
+
 /**
  * Cuenta un intento fallido. No se borra el registro: si el servidor no
  * respondió, el acceso sigue siendo real y debe reintentarse.
@@ -175,6 +181,7 @@ self.BDOffline = {
     listarPendientes,
     contarPendientes,
     eliminarPendiente,
+    limpiarPendientes,
     marcarIntentoFallido,
     guardarPerfil,
     leerPerfil,

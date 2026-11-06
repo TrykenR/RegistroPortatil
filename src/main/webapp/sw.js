@@ -26,7 +26,7 @@
 'use strict';
 
 // Subir este número obliga a refrescar la caché en todos los celulares.
-const VERSION_CACHE = 'autogestion-v12';
+const VERSION_CACHE = 'autogestion-v13';
 
 const ARCHIVOS_DEL_SHELL = [
     './',
@@ -197,57 +197,75 @@ self.addEventListener('message', (evento) => {
  * - Un 403 (equipo que ya no pertenece al estudiante) sí borra el
  *   pendiente: reintentarlo para siempre solo llenaría la cola.
  */
+const MAX_REINTENTOS_OFFLINE = 3;
+
+/**
+ * Recorre la cola de IndexedDB y envía cada registro al backend.
+ *
+ * Reglas que sigue:
+ * - Borra el pendiente si el servidor confirma o si es un registro duplicado ya registrado.
+ * - Un 403, 400 o 404 (datos inexistentes/inválidos) o superar MAX_REINTENTOS_OFFLINE 
+ *   sí borra el pendiente para evitar atascos permanentes en el dispositivo.
+ */
 async function sincronizarPendientes() {
     const pendientes = await self.BDOffline.listarPendientes();
     if (!pendientes.length) return;
 
     let sincronizados = 0;
+    let modificados = false;
 
     for (const registro of pendientes) {
         try {
             const cuerpo = new URLSearchParams({
-                idEstudiante:      registro.idEstudiante,
-                idDispositivo:     registro.idDispositivo,
-                fechaEventoCliente: registro.fechaEvento
+                idEstudiante:       registro.idEstudiante,
+                idDispositivo:      registro.idDispositivo,
+                fechaEventoCliente: registro.fechaEvento,
+                idOrigen:           '2'
             });
 
             const respuesta = await fetch('./api/accesos', {
                 method: 'POST',
                 body: cuerpo,
-                // Esta petición corre en segundo plano, a veces sin ninguna
-                // pestaña abierta (Background Sync puede dispararse con la
-                // app cerrada) — no se puede depender de que el navegador
-                // ya haya "aceptado" el aviso de Ngrok en esa sesión. El
-                // encabezado evita que la respuesta venga como HTML del
-                // aviso en vez del JSON real, lo que rompería el parseo
-                // de abajo y dejaría el registro atascado en la cola.
                 headers: { 'ngrok-skip-browser-warning': 'true' }
             });
 
             if (respuesta.ok) {
                 const datos = await respuesta.json();
-                if (datos.ok) {
+                if (datos.ok || datos.movimiento) {
                     await self.BDOffline.eliminarPendiente(registro.idLocal);
                     sincronizados++;
+                    modificados = true;
                     continue;
                 }
             }
 
-            if (respuesta.status === 403 || respuesta.status === 400) {
-                // Error permanente: reintentar no va a cambiar nada.
+            // Error de cliente permanente (400, 403, 404, etc.)
+            if (respuesta.status >= 400 && respuesta.status < 500) {
                 await self.BDOffline.eliminarPendiente(registro.idLocal);
+                modificados = true;
+                continue;
+            }
+
+            // Descartar tras superar límite de reintentos
+            if ((registro.intentos || 0) >= MAX_REINTENTOS_OFFLINE) {
+                await self.BDOffline.eliminarPendiente(registro.idLocal);
+                modificados = true;
                 continue;
             }
 
             await self.BDOffline.marcarIntentoFallido(registro);
 
         } catch (error) {
-            // Sigue sin red. Se queda en cola para el próximo intento.
-            await self.BDOffline.marcarIntentoFallido(registro);
+            if ((registro.intentos || 0) >= MAX_REINTENTOS_OFFLINE) {
+                await self.BDOffline.eliminarPendiente(registro.idLocal);
+                modificados = true;
+            } else {
+                await self.BDOffline.marcarIntentoFallido(registro);
+            }
         }
     }
 
-    if (sincronizados > 0) {
+    if (modificados) {
         await avisarAlaApp(sincronizados);
     }
 }
