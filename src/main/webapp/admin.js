@@ -151,6 +151,24 @@ async function iniciar() {
     // Inicializar control de tema en admin
     iniciarControlTemaAdmin();
 
+    // Auto-detección de entrada mediante código especial desde index.html
+    const paramsUrl = new URLSearchParams(window.location.search);
+    const codigoEspecial = paramsUrl.get('codigo') || sessionStorage.getItem('autogestion_admin_code');
+    if (codigoEspecial) {
+        sessionStorage.removeItem('autogestion_admin_code');
+        const campoUsuario = $('#campo-usuario');
+        const campoClave = $('#campo-clave');
+        if (campoUsuario) {
+            campoUsuario.value = 'admin';
+            campoUsuario.readOnly = true;
+            campoUsuario.style.opacity = '0.7';
+            campoUsuario.style.pointerEvents = 'none';
+        }
+        if (campoClave) {
+            campoClave.focus();
+        }
+    }
+
     // Si ya hay una sesión viva (el navegador manda la cookie sola),
     // /api/admin/historial responde bien y saltamos directo al panel
     // sin pedir usuario/clave de nuevo.

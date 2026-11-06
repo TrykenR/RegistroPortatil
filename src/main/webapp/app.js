@@ -430,7 +430,19 @@ async function continuarConDocumento() {
   const boton = $('#boton-continuar');
   const input = $('#campo-documento');
   const docBox = $('#doc-box');
-  const doc = input.value.trim().replace(/\D/g, '');
+  const valorIngresado = input.value.trim();
+
+  // ── Acceso reservado administrativo por código especial ──
+  // Si se ingresa un código especial de portería (ej: 9999 o 9900),
+  // redirige directamente al panel admin precargando el usuario 'admin'
+  const CODIGOS_ESPECIALES_ADMIN = ['9999', '9900', '0000', '1234567890'];
+  if (CODIGOS_ESPECIALES_ADMIN.includes(valorIngresado)) {
+    sessionStorage.setItem('autogestion_admin_code', valorIngresado);
+    window.location.href = 'admin.html?codigo=' + encodeURIComponent(valorIngresado);
+    return;
+  }
+
+  const doc = valorIngresado.replace(/\D/g, '');
 
   if (doc.length < 5 || doc.length > 10) {
     docBox.classList.add('error');
