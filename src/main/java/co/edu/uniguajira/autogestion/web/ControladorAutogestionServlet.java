@@ -2,6 +2,7 @@ package co.edu.uniguajira.autogestion.web;
 
 import co.edu.uniguajira.autogestion.dao.DispositivoDAO;
 import co.edu.uniguajira.autogestion.dao.EstudianteDAO;
+import co.edu.uniguajira.autogestion.dao.HistorialAccesoDAO;
 import co.edu.uniguajira.autogestion.modelo.Dispositivo;
 import co.edu.uniguajira.autogestion.modelo.Estudiante;
 import jakarta.servlet.ServletException;
@@ -20,6 +21,7 @@ public class ControladorAutogestionServlet extends HttpServlet {
 
     private final EstudianteDAO estudianteDAO = new EstudianteDAO();
     private final DispositivoDAO dispositivoDAO = new DispositivoDAO();
+    private final HistorialAccesoDAO historialAccesoDAO = new HistorialAccesoDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
@@ -50,12 +52,17 @@ public class ControladorAutogestionServlet extends HttpServlet {
                 StringBuilder dispJson = new StringBuilder("[");
                 for (int i = 0; i < dispositivos.size(); i++) {
                     Dispositivo d = dispositivos.get(i);
+                    int ultimoMov = historialAccesoDAO.obtenerUltimoMovimientoHoy(d.getIdDispositivo());
+                    String proximoMov = (ultimoMov == HistorialAccesoDAO.ENTRADA) ? "SALIDA" : "ENTRADA";
+
                     dispJson.append(String.format(
-                        "{\"id\":%d,\"id_dispositivo\":%d,\"marca\":\"%s\",\"color\":\"%s\",\"alias\":\"%s\"}",
+                        "{\"id\":%d,\"id_dispositivo\":%d,\"marca\":\"%s\",\"color\":\"%s\",\"alias\":\"%s\",\"ultimoMovimiento\":%d,\"siguienteMovimiento\":\"%s\"}",
                         d.getIdDispositivo(), d.getIdDispositivo(),
                         d.getMarca() != null ? d.getMarca() : "",
                         d.getColor() != null ? d.getColor() : "",
-                        d.getAlias() != null ? d.getAlias().replace("\"", "'") : ""
+                        d.getAlias() != null ? d.getAlias().replace("\"", "'") : "",
+                        ultimoMov,
+                        proximoMov
                     ));
                     if (i < dispositivos.size() - 1) dispJson.append(",");
                 }

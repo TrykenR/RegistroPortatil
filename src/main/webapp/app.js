@@ -309,7 +309,7 @@ function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('sw.js').then((reg) => {
     navigator.serviceWorker.addEventListener('message', (evento) => {
-      if (evento.data && evento.data.tipo === 'COLA_SINCRONIZADA') {
+      if (evento.data && (evento.data.tipo === 'COLA_SINCRONIZADA' || evento.data.tipo === 'SINCRONIZADOS')) {
         actualizarBarraEstado();
       }
     });
@@ -322,9 +322,9 @@ async function solicitarSincronizacion() {
     const reg = await navigator.serviceWorker.ready;
     if ('sync' in reg) {
       await reg.sync.register('sincronizar-accesos');
-    } else {
-      reg.active?.postMessage({ tipo: 'INTENTAR_SINCRONIZACION' });
     }
+    // Siempre intentamos notificar al Service Worker por si sync está retrasado
+    reg.active?.postMessage({ tipo: 'SINCRONIZAR' });
   } catch (e) { /* ignore */ }
 }
 
@@ -953,10 +953,25 @@ async function registrarAcceso(equipo, botonTocado, pinConfirmado = null) {
 
 async function encolarYConfirmar(equipo, fechaEvento) {
   try {
+    // Determinar alternancia offline según el último estado conocido del equipo
+    let movDeterminado = 'ENTRADA';
+    if (equipo.siguienteMovimiento) {
+      movDeterminado = equipo.siguienteMovimiento;
+    } else if (equipo.ultimoMovimiento === 1) {
+      movDeterminado = 'SALIDA';
+    } else if (equipo.ultimoMovimiento === 2) {
+      movDeterminado = 'ENTRADA';
+    }
+
+    // Alternar localmente para próximas marcaciones en esta misma sesión offline
+    equipo.ultimoMovimiento = (movDeterminado === 'ENTRADA') ? 1 : 2;
+    equipo.siguienteMovimiento = (movDeterminado === 'ENTRADA') ? 'SALIDA' : 'ENTRADA';
+
     await self.BDOffline.encolarPendiente({
       idEstudiante: estado.idEstudiante,
       idDispositivo: equipo.id,
       fechaEvento,
+      movimiento: movDeterminado,
       marca: equipo.marca,
       color: equipo.color,
       hex: getColorHex(equipo.color)
@@ -968,7 +983,7 @@ async function encolarYConfirmar(equipo, fechaEvento) {
     pintarConfirmacion({
       marca: equipo.marca,
       color: equipo.color,
-      movimiento: 'ENTRADA',
+      movimiento: movDeterminado,
       hora: formatHora(new Date())
     }, true);
 

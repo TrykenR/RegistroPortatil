@@ -145,11 +145,12 @@ public class HistorialAccesoDAO {
 
     /**
      * Obtiene el último tipo de movimiento registrado hoy para el dispositivo (0 si no hay registros hoy).
+     * Usa DATE(NOW()) con la zona horaria de la sesión (-05:00) para sincronía total con Colombia.
      */
     public int obtenerUltimoMovimientoHoy(int idDispositivo) throws SQLException {
         String sql = "SELECT id_tipo_movimiento FROM Historial_Accesos " +
-                     " WHERE id_dispositivo = ? AND DATE(fecha_hora_evento) = CURDATE() " +
-                     " ORDER BY fecha_hora_evento DESC LIMIT 1";
+                     " WHERE id_dispositivo = ? AND DATE(fecha_hora_evento) = DATE(NOW()) " +
+                     " ORDER BY fecha_hora_evento DESC, id_registro DESC LIMIT 1";
         try (Connection cn = ConexionBD.obtenerConexion();
              PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setInt(1, idDispositivo);

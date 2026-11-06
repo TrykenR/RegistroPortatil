@@ -38,7 +38,11 @@ public class RegistroAccesoServlet extends HttpServlet {
                 request.getParameter("idDispositivo") : request.getParameter("id_dispositivo");
 
         String fechaEventoParam = request.getParameter("fechaEvento");
+        if (fechaEventoParam == null || fechaEventoParam.isBlank()) {
+            fechaEventoParam = request.getParameter("fechaEventoCliente");
+        }
         String pinParam = request.getParameter("pin");
+        String idOrigenParam = request.getParameter("idOrigen");
 
         if (idEstudianteParam == null || idDispositivoParam == null) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -74,12 +78,16 @@ public class RegistroAccesoServlet extends HttpServlet {
                 return;
             }
 
-            // 4. Determinar fecha del evento (soporta offline si viene en la petición)
+            // 4. Determinar fecha del evento y origen (soporta offline si viene en la petición)
+            boolean esSincronizacionOffline = (request.getParameter("fechaEventoCliente") != null && !request.getParameter("fechaEventoCliente").isBlank())
+                    || "2".equals(idOrigenParam);
+            int idOrigenFinal = esSincronizacionOffline ? HistorialAcceso.ORIGEN_OFFLINE_SINCRONIZADO : HistorialAcceso.ORIGEN_ONLINE;
+
             LocalDateTime fechaEvento = fechaEventoParam != null && !fechaEventoParam.isBlank() ?
                     LocalDateTime.parse(fechaEventoParam.replace(" ", "T")) : LocalDateTime.now();
 
-            // 5. Antirrebote
-            if (historialAccesoDAO.existeRegistroReciente(idDispositivo)) {
+            // 5. Antirrebote (solo para eventos en vivo, para no descartar sincronizaciones offline legítimas)
+            if (!esSincronizacionOffline && historialAccesoDAO.existeRegistroReciente(idDispositivo)) {
                 response.setStatus(HttpServletResponse.SC_OK);
                 out.printf("{\"ok\":true,\"movimiento\":\"REGISTRADO\",\"marca\":\"%s\",\"color\":\"%s\",\"hora\":\"%s\",\"mensaje\":\"Registro duplicado evitado por antirrebote\"}",
                         dispositivo.getMarca(), dispositivo.getColor(), formatHoraActual());
@@ -121,7 +129,7 @@ public class RegistroAccesoServlet extends HttpServlet {
             HistorialAcceso historial = new HistorialAcceso();
             historial.setIdDispositivo(idDispositivo);
             historial.setIdTipoMovimiento(sig.movimiento); // 1 = ENTRADA, 2 = SALIDA
-            historial.setIdOrigen(1); // 1 = Autogestión PWA
+            historial.setIdOrigen(idOrigenFinal);
             historial.setFechaHoraEvento(fechaEvento);
 
             historialAccesoDAO.registrar(historial);
